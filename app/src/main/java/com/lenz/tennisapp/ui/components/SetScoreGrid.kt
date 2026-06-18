@@ -90,9 +90,9 @@ fun SetScoreGrid(
                 Text(
                     text = gHome,
                     fontSize = gameSize,
-                    color = AuraPurple,
+                    color = Color.Red,
                     fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(start = 2.dp)
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
         }
@@ -121,9 +121,9 @@ fun SetScoreGrid(
                 Text(
                     text = gAway,
                     fontSize = gameSize,
-                    color = AuraDeep.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 2.dp)
+                    color = Color.Red,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
         }

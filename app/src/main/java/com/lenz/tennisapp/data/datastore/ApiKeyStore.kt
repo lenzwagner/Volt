@@ -24,7 +24,7 @@ class ApiKeyStore @Inject constructor(
         val KEY_ODDS_REQUESTS_REMAINING = intPreferencesKey("odds_requests_remaining")
 
         // Default keys (user-provided; change in Settings when expired)
-        const val DEFAULT_TENNIS_KEY = "f0f0e5e1da68afd8f29e7bdc62bdf556de4a23e67d48813d91f55f85b14c4987"
+        const val DEFAULT_TENNIS_KEY = "83f1ca0d81403233614126fb77fe4d1dd9f7e28c878e6d64e700e6e4a9d38202"
         const val DEFAULT_ODDS_KEY = "f521a4027f371eb92416e22b61d42064"
     }
 

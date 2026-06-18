@@ -424,12 +424,22 @@ private fun LiveIndicator() {
         color = Color.Red,
         modifier = Modifier.scale(scale)
     ) {
-        Text(
-            "LIVE",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = Color.White,
-            fontWeight = FontWeight.Black,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Surface(
+                color = Color.White,
+                shape = CircleShape,
+                modifier = Modifier.size(6.dp)
+            ) {}
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "LIVE",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+            )
+        }
     }
 }

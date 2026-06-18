@@ -203,6 +203,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             keyStore.setTennisKeyExpired(false)
         }
+        refresh()
         startPolling()
         
         // Update tips when tournaments change

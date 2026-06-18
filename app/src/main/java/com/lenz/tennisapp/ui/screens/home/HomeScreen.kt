@@ -134,7 +134,7 @@ fun HomeScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 items(filteredTournaments, key = { it.id }) { tournament ->
                     TournamentCard(
@@ -461,7 +461,7 @@ private fun TournamentCard(
                         )
                         Text("·", color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
                         Text(
-                            "${categoryPoints(tournament.category)} Pts",
+                            "${categoryPoints(tournament.category, tournament.name)} Pts",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = Color.White.copy(alpha = 0.5f)
                         )
@@ -556,14 +556,22 @@ private fun surfaceName(surface: CourtSurface) = when (surface) {
     CourtSurface.UNKNOWN     -> "—"
 }
 
-private fun categoryPoints(cat: TournamentCategory) = when (cat) {
-    TournamentCategory.GRAND_SLAM                                  -> "2000"
+private fun categoryPoints(cat: TournamentCategory, tournamentName: String = "") = when (cat) {
+    TournamentCategory.GRAND_SLAM                                    -> "2000"
     TournamentCategory.ATP_MASTERS_1000, TournamentCategory.WTA_1000 -> "1000"
     TournamentCategory.ATP_500,          TournamentCategory.WTA_500  -> "500"
     TournamentCategory.ATP_250,          TournamentCategory.WTA_250  -> "250"
-    TournamentCategory.CHALLENGER                                  -> "125"
-    TournamentCategory.ITF                                         -> "ITF"
-    TournamentCategory.OTHER                                       -> "—"
+    TournamentCategory.CHALLENGER -> {
+        // ATP Challengers: extract point level from name (e.g. "Bordeaux 175" → "175")
+        val match = Regex("(175|125|100|75)").find(tournamentName)
+        match?.value ?: "Chal."
+    }
+    TournamentCategory.ITF -> {
+        // ITF events: extract M/W prefix (e.g. "M25 Klosters" → "25", "W75 Blois" → "75")
+        val match = Regex("^[MWmw](\\d+)").find(tournamentName.trim())
+        match?.groupValues?.get(1) ?: "ITF"
+    }
+    TournamentCategory.OTHER -> "—"
 }
 
 private fun categoryColor(cat: TournamentCategory) = when (cat) {

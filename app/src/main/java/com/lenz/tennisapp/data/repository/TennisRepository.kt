@@ -768,17 +768,81 @@ private fun inferCategory(eventTypeType: String): TournamentCategory {
 // Called after initial category to refine ATP/WTA by tournament prestige
 private fun refineCategoryByTournamentName(name: String, baseCategory: TournamentCategory): TournamentCategory {
     val n = name.lowercase()
-    val isWta = baseCategory == TournamentCategory.WTA_250
-    return when {
-        n.contains("australian open") || n.contains("french open") ||
-                n.contains("wimbledon") || n.contains("us open") -> TournamentCategory.GRAND_SLAM
+    val isWta = baseCategory == TournamentCategory.WTA_250 || baseCategory == TournamentCategory.WTA_500 || baseCategory == TournamentCategory.WTA_1000
+
+    // Grand Slams
+    if (n.contains("australian open") || n.contains("roland") || n.contains("french open") ||
+        n.contains("wimbledon") || n.contains("us open")) return TournamentCategory.GRAND_SLAM
+
+    // ATP Masters 1000 (2026)
+    if (!isWta && (
         n.contains("indian wells") || n.contains("miami") || n.contains("monte carlo") ||
-                n.contains("madrid") || n.contains("rome") || n.contains("canada") ||
-                n.contains("cincinnati") || n.contains("shanghai") || n.contains("paris masters") ||
-                n.contains("nitto") -> if (isWta) TournamentCategory.WTA_1000 else TournamentCategory.ATP_MASTERS_1000
-        n.contains("500") -> if (isWta) TournamentCategory.WTA_500 else TournamentCategory.ATP_500
-        else -> baseCategory
-    }
+        n.contains("monte-carlo") || n.contains("madrid") || n.contains("rome") ||
+        n.contains("internazionali") || n.contains("canada") || n.contains("montreal") ||
+        n.contains("toronto") || n.contains("cincinnati") || n.contains("shanghai") ||
+        n.contains("paris masters") || n.contains("paris") && n.contains("master") ||
+        n.contains("nitto")
+    )) return TournamentCategory.ATP_MASTERS_1000
+
+    // WTA 1000 (2026)
+    if (isWta && (
+        n.contains("indian wells") || n.contains("miami") || n.contains("madrid") ||
+        n.contains("rome") || n.contains("internazionali") || n.contains("montreal") ||
+        n.contains("toronto") || n.contains("canada") || n.contains("cincinnati") ||
+        n.contains("guadalajara") || n.contains("beijing") || n.contains("china open") ||
+        n.contains("wuhan") || n.contains("doha") || n.contains("qatar") || n.contains("dubai")
+    )) return TournamentCategory.WTA_1000
+
+    // ATP 500 (2026)
+    if (!isWta && (
+        n.contains("dallas") || n.contains("rotterdam") || n.contains("doha") ||
+        n.contains("rio") || n.contains("dubai") || n.contains("acapulco") ||
+        n.contains("barcelona") || n.contains("munich") || n.contains("hamburg") ||
+        n.contains("halle") || n.contains("london") || n.contains("queens") ||
+        n.contains("tokyo") || n.contains("vienna") || n.contains("basel") ||
+        n.contains("stockholm")
+    )) return TournamentCategory.ATP_500
+
+    // WTA 500 (2026)
+    if (isWta && (
+        n.contains("brisbane") || n.contains("adelaide") || n.contains("abu dhabi") ||
+        n.contains("linz") || n.contains("stuttgart") || n.contains("london") ||
+        n.contains("berlin") || n.contains("bad homburg") || n.contains("hamburg") ||
+        n.contains("washington") || n.contains("singapore") || n.contains("ningbo") ||
+        n.contains("toray") || n.contains("pan pacific") || n.contains("tokyo")
+    )) return TournamentCategory.WTA_500
+
+    // ATP 250 (2026) — explicit list to avoid false positives
+    if (!isWta && (
+        n.contains("hong kong") || n.contains("auckland") || n.contains("delray") ||
+        n.contains("buenos aires") || n.contains("montpellier") || n.contains("marseille") ||
+        n.contains("santiago") || n.contains("houston") || n.contains("marrakesh") ||
+        n.contains("bucharest") || n.contains("geneva") || n.contains("hertogenbosch") ||
+        n.contains("rosmalen") || n.contains("boss open") || n.contains("mallorca") ||
+        n.contains("eastbourne") || n.contains("bastad") || n.contains("gstaad") ||
+        n.contains("umag") || n.contains("kitzbuhel") || n.contains("kitzbühel") ||
+        n.contains("estoril") || n.contains("los cabos") || n.contains("winston-salem") ||
+        n.contains("winston salem") || n.contains("chengdu") || n.contains("hangzhou") ||
+        n.contains("almaty") || n.contains("brussels") || n.contains("metz") ||
+        n.contains("stockholm") || n.contains("nordic open") || n.contains("tiriac") ||
+        n.contains("belgrade") || n.contains("munich") && n.contains("250")
+    )) return TournamentCategory.ATP_250
+
+    // WTA 250 (2026)
+    if (isWta && (
+        n.contains("auckland") || n.contains("hobart") || n.contains("cluj") ||
+        n.contains("transylvania") || n.contains("merida") || n.contains("mérida") ||
+        n.contains("austin") || n.contains("charleston") || n.contains("bogota") ||
+        n.contains("bogotá") || n.contains("rouen") || n.contains("strasbourg") ||
+        n.contains("rabat") || n.contains("hertogenbosch") || n.contains("rosmalen") ||
+        n.contains("nottingham") || n.contains("eastbourne") || n.contains("iasi") ||
+        n.contains("prague") || n.contains("monterrey") || n.contains("cleveland") ||
+        n.contains("sao paulo") || n.contains("são paulo") || n.contains("seoul") ||
+        n.contains("kinoshita") || n.contains("guangzhou") || n.contains("chennai") ||
+        n.contains("jiujiang") || n.contains("jiangxi")
+    )) return TournamentCategory.WTA_250
+
+    return baseCategory
 }
 
 private fun oddsSportKey(category: String): String = when (category) {
