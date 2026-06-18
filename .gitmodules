@@ -1,0 +1,3 @@
+[submodule "tennis-ranking-proxy"]
+	path = tennis-ranking-proxy
+	url = https://github.com/lenzwagner/tennis-ranking-proxy

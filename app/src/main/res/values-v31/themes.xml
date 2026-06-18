@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TennisApp" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- System Splash deaktiviert - nur Custom Splash wird angezeigt -->
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
