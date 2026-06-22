@@ -409,6 +409,10 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
     val p1Sets = sets.count { it.complete && it.s1 > it.s2 }
     val p2Sets = sets.count { it.complete && it.s2 > it.s1 }
 
+    // If live and all listed sets are complete, the new set is 0-0 — append it.
+    val allComplete = sets.isNotEmpty() && sets.all { it.complete }
+    val displaySets = if (isInPlay && allComplete) sets + SetInfo(0, 0, false) else sets
+
     val gameParts = match.gameScore?.takeIf { it.isNotBlank() && it != "-" }?.split("-")
     val g1 = gameParts?.getOrNull(0)?.trim() ?: ""
     val g2 = gameParts?.getOrNull(1)?.trim() ?: ""
@@ -439,9 +443,9 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
         PlayerScoreRow(
             player = match.homePlayer,
             isServing = match.isHomeServing == true && isInPlay,
-            sets = sets.map { it.s1 },
-            opponentSets = sets.map { it.s2 },
-            setsComplete = sets.map { it.complete },
+            sets = displaySets.map { it.s1 },
+            opponentSets = displaySets.map { it.s2 },
+            setsComplete = displaySets.map { it.complete },
             totalSetsWon = p1Sets,
             gamePoints = g1,
             hasScore = hasScoreData,
@@ -454,9 +458,9 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
         PlayerScoreRow(
             player = match.awayPlayer,
             isServing = match.isHomeServing == false && isInPlay,
-            sets = sets.map { it.s2 },
-            opponentSets = sets.map { it.s1 },
-            setsComplete = sets.map { it.complete },
+            sets = displaySets.map { it.s2 },
+            opponentSets = displaySets.map { it.s1 },
+            setsComplete = displaySets.map { it.complete },
             totalSetsWon = p2Sets,
             gamePoints = g2,
             hasScore = hasScoreData,
@@ -538,25 +542,15 @@ private fun PlayerScoreRow(
                     val iWon = complete && myScore > oppScore
                     val oppWon = complete && oppScore > myScore
 
-                    if (complete) {
-                        if (iWon) {
-                            Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        } else if (oppWon) {
-                            Surface(
-                                color = Color(0xFFCC2200),
-                                shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.defaultMinSize(minWidth = 24.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)) {
-                                    Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                }
-                            }
-                        } else {
-                            Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
-                        }
-                    } else {
-                        Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    val color = when {
+                        !complete              -> Color(0xFFE53935)          // current set → red
+                        iWon                  -> Color.White                 // set winner → bright
+                        oppWon                -> Color.White.copy(alpha = 0.3f) // set loser → dim
+                        else                  -> Color.White.copy(alpha = 0.3f)
                     }
+                    val weight = if (iWon) FontWeight.Black else if (!complete) FontWeight.Black else FontWeight.Normal
+
+                    Text(myScore.toString(), fontSize = 17.sp, fontWeight = weight, color = color)
                 }
 
                 // Separator + game points
