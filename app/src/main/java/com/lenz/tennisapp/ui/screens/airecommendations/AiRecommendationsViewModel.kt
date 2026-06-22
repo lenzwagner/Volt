@@ -22,7 +22,8 @@ data class AiRecommendationsUiState(
     val date: String = "",
     val isLoading: Boolean = true,
     val error: String? = null,
-    val sortMode: AiSortMode = AiSortMode.WEIGHTED
+    val sortMode: AiSortMode = AiSortMode.WEIGHTED,
+    val allSorted: List<PredictionMatchDto> = emptyList()
 )
 
 @HiltViewModel
@@ -38,7 +39,8 @@ class AiRecommendationsViewModel @Inject constructor(
     fun refresh() { load() }
 
     fun setSortMode(mode: AiSortMode) {
-        _uiState.value = _uiState.value.copy(sortMode = mode)
+        val sorted = _uiState.value.matches.sortedByDescending { it.sortScore(mode) }
+        _uiState.value = _uiState.value.copy(sortMode = mode, allSorted = sorted)
     }
 
     private fun load() {
@@ -47,10 +49,13 @@ class AiRecommendationsViewModel @Inject constructor(
             try {
                 val response = repository.getAiPredictions()
                 val data = response?.data
+                val matches = data?.matches ?: emptyList()
+                val mode = _uiState.value.sortMode
                 _uiState.value = _uiState.value.copy(
-                    matches = data?.matches ?: emptyList(),
+                    matches = matches,
                     date = data?.date ?: "",
-                    isLoading = false
+                    isLoading = false,
+                    allSorted = matches.sortedByDescending { it.sortScore(mode) }
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = "Fehler beim Laden")

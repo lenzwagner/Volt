@@ -57,9 +57,7 @@ fun AiRecommendationsScreen(
     val topPicks = remember(state.matches) {
         state.matches.filter { it.isTopPick() }.sortedByDescending { it.sortScore(AiSortMode.WEIGHTED) }
     }
-    val allSorted = remember(state.matches, state.sortMode) {
-        state.matches.sortedByDescending { it.sortScore(state.sortMode) }
-    }
+    val allSorted = state.allSorted
 
     PullToRefreshBox(
         isRefreshing = state.isLoading,
