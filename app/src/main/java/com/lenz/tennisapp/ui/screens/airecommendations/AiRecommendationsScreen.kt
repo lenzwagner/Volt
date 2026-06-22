@@ -55,8 +55,8 @@ fun AiRecommendationsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var allExpanded by remember { mutableStateOf(false) }
 
-    val topPicks = remember(state.matches) {
-        state.matches.filter { it.isTopPick() }.sortedByDescending { it.sortScore(AiSortMode.WEIGHTED) }
+    val topPicks = remember(state.filtered) {
+        state.filtered.filter { it.dto.isTopPick() }.sortedByDescending { it.dto.sortScore(AiSortMode.WEIGHTED) }
     }
     val allSorted = state.allSorted
 
@@ -93,6 +93,61 @@ fun AiRecommendationsScreen(
                 }
             }
 
+            // ── Tour filter chips ─────────────────────────────────────────
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(AiTourFilter.entries.size) { i ->
+                        val f = AiTourFilter.entries[i]
+                        FilterChip(
+                            selected = state.tourFilter == f,
+                            onClick = { viewModel.setTourFilter(f) },
+                            label = { Text(f.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AuraPurple,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = state.tourFilter == f,
+                                borderColor = AuraDeep.copy(alpha = 0.15f),
+                                selectedBorderColor = AuraPurple
+                            )
+                        )
+                    }
+                }
+            }
+
+            // ── Category filter chips ─────────────────────────────────────
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(AiCategoryFilter.entries.size) { i ->
+                        val f = AiCategoryFilter.entries[i]
+                        FilterChip(
+                            selected = state.categoryFilter == f,
+                            onClick = { viewModel.setCategoryFilter(f) },
+                            label = { Text(f.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AuraPurple,
+                                selectedLabelColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = state.categoryFilter == f,
+                                borderColor = AuraDeep.copy(alpha = 0.15f),
+                                selectedBorderColor = AuraPurple
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
             // ── Loading / Error / Empty ───────────────────────────────────
             if (state.error != null) {
                 item {
@@ -102,7 +157,7 @@ fun AiRecommendationsScreen(
                 }
                 return@LazyColumn
             }
-            if (state.matches.isEmpty()) {
+            if (state.enriched.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(48.dp),
@@ -136,8 +191,8 @@ fun AiRecommendationsScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(topPicks, key = { "${it.p1Fullname}_${it.p2Fullname}_top" }) { match ->
-                            TopPickCard(match, onClick = { viewModel.findAndNavigate(match.p1Fullname, match.p2Fullname, onMatchClick) })
+                        items(topPicks, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_top" }) { match ->
+                            TopPickCard(match.dto, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
                         }
                     }
                 }
@@ -191,7 +246,7 @@ fun AiRecommendationsScreen(
                             color = AuraDeep
                         )
                         Text(
-                            "${allSorted.size} Matches · sortiert nach Stärke",
+                            "${allSorted.size} Matches",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -206,8 +261,8 @@ fun AiRecommendationsScreen(
             }
 
             if (allExpanded) {
-                items(allSorted, key = { "${it.p1Fullname}_${it.p2Fullname}_all" }) { match ->
-                    CompactPickRow(match, onClick = { viewModel.findAndNavigate(match.p1Fullname, match.p2Fullname, onMatchClick) })
+                items(allSorted, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_all" }) { match ->
+                    CompactPickRow(match.dto, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }

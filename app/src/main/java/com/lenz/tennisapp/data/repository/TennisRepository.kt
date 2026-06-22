@@ -68,24 +68,46 @@ class TennisRepository @Inject constructor(
 
     suspend fun getAiPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? = getCachedPredictions()
 
+    private fun aiNameKey(raw: String): String {
+        val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (parts.isEmpty()) return ""
+        val isInitial = { t: String -> t.length <= 2 && (t.endsWith(".") || t.length == 1) }
+        val names = parts.filterNot(isInitial)
+        val last = (names.lastOrNull() ?: parts.last()).lowercase().trim('.', ',')
+        val firstInitial = (parts.filter(isInitial).firstOrNull()?.firstOrNull()
+            ?: names.firstOrNull()?.firstOrNull())?.lowercaseChar() ?: ' '
+        return "$last|$firstInitial"
+    }
+
     suspend fun findMatchIdByPlayers(p1: String, p2: String): String? {
         val dateStr = java.time.LocalDate.now().format(dateFormatter)
         val matches = matchDao.getMatchesForDate(dateStr).first()
-        fun nk(raw: String): String {
-            val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-            if (parts.isEmpty()) return ""
-            val isInitial = { t: String -> t.length <= 2 && (t.endsWith(".") || t.length == 1) }
-            val names = parts.filterNot(isInitial)
-            val last = (names.lastOrNull() ?: parts.last()).lowercase().trim('.', ',')
-            val firstInitial = (parts.filter(isInitial).firstOrNull()?.firstOrNull()
-                ?: names.firstOrNull()?.firstOrNull())?.lowercaseChar() ?: ' '
-            return "$last|$firstInitial"
-        }
-        val k1 = nk(p1); val k2 = nk(p2)
+        val k1 = aiNameKey(p1); val k2 = aiNameKey(p2)
         return matches.find { m ->
-            val hk = nk(m.homePlayer); val ak = nk(m.awayPlayer)
+            val hk = aiNameKey(m.homePlayer); val ak = aiNameKey(m.awayPlayer)
             (hk == k1 && ak == k2) || (hk == k2 && ak == k1)
         }?.id
+    }
+
+    suspend fun enrichAiPredictions(dtos: List<com.lenz.tennisapp.data.api.PredictionMatchDto>): List<com.lenz.tennisapp.ui.screens.airecommendations.EnrichedAiPrediction> {
+        val dateStr = java.time.LocalDate.now().format(dateFormatter)
+        val entities = matchDao.getMatchesForDate(dateStr).first()
+        return dtos.map { dto ->
+            val k1 = aiNameKey(dto.p1Fullname); val k2 = aiNameKey(dto.p2Fullname)
+            val entity = entities.find { m ->
+                val hk = aiNameKey(m.homePlayer); val ak = aiNameKey(m.awayPlayer)
+                (hk == k1 && ak == k2) || (hk == k2 && ak == k1)
+            }
+            val cat = entity?.let {
+                try { TournamentCategory.valueOf(it.tournamentCategory) } catch (e: Exception) { TournamentCategory.OTHER }
+            }
+            com.lenz.tennisapp.ui.screens.airecommendations.EnrichedAiPrediction(
+                dto = dto,
+                matchId = entity?.id,
+                category = cat,
+                eventType = entity?.eventType ?: ""
+            )
+        }
     }
 
     private suspend fun getCachedPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? {
@@ -845,10 +867,49 @@ class TennisRepository @Inject constructor(
         // External prediction only — no internal fallback. Null = section hidden.
         val prediction = externalPrediction
 
+        // If match just finished, prepend it to H2H so the result shows immediately
+        fun inferWinner(score: String?, hKey: String, aKey: String): String? {
+            if (score.isNullOrBlank()) return null
+            return try {
+                var h = 0; var a = 0
+                for (set in score.split(",")) {
+                    val p = set.trim().split("-")
+                    if (p.size < 2) continue
+                    val hg = p[0].trim().takeWhile { it.isDigit() }.toIntOrNull() ?: continue
+                    val ag = p[1].trim().takeWhile { it.isDigit() }.toIntOrNull() ?: continue
+                    if (hg > ag) h++ else if (ag > hg) a++
+                }
+                when { h > a -> hKey; a > h -> aKey; else -> null }
+            } catch (_: Exception) { null }
+        }
+        val winnerKey = match.winnerKey ?: inferWinner(match.finalResult, entity.homePlayerKey, entity.awayPlayerKey)
+        val finalH2H = if (match.status == MatchStatus.FINISHED && winnerKey != null) {
+            val winnerName = if (winnerKey == entity.homePlayerKey) match.homePlayer.name else match.awayPlayer.name
+            val alreadyPresent = h2hResult.recentMatches.firstOrNull()?.date == match.date &&
+                h2hResult.recentMatches.firstOrNull()?.tournament == match.tournament
+            if (alreadyPresent) h2hResult else {
+                val todayEntry = H2HMatch(
+                    date = match.date,
+                    winner = winnerName,
+                    score = match.finalResult ?: "",
+                    tournament = match.tournament,
+                    surface = match.surface,
+                    round = match.round ?: ""
+                )
+                H2HResult(
+                    player1Name = h2hResult.player1Name,
+                    player2Name = h2hResult.player2Name,
+                    player1Wins = h2hResult.player1Wins + if (winnerKey == entity.homePlayerKey) 1 else 0,
+                    player2Wins = h2hResult.player2Wins + if (winnerKey == entity.awayPlayerKey) 1 else 0,
+                    recentMatches = listOf(todayEntry) + h2hResult.recentMatches
+                )
+            }
+        } else h2hResult
+
         val detail = MatchDetail(
             match = match,
             stats = emptyList(),
-            h2h = h2hResult,
+            h2h = finalH2H,
             odds = odds,
             prediction = prediction,
             player1Elo = p1Entity?.toEloProfile(),
