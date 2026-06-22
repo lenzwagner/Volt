@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -105,12 +106,22 @@ fun HomeScreen(
                     }
                 }
 
+                val listState = rememberLazyListState()
+                // When the live filter toggles, glide back to the top so you're not
+                // left stranded inside a tournament that just got filtered out.
+                var firstFilterRun by remember { mutableStateOf(true) }
+                LaunchedEffect(liveFilter) {
+                    if (firstFilterRun) { firstFilterRun = false; return@LaunchedEffect }
+                    listState.animateScrollToItem(0)
+                }
+
                 PullToRefreshBox(
                     isRefreshing = state.isRefreshing,
                     onRefresh = viewModel::refresh,
                     modifier = Modifier.fillMaxSize()
                 ) {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 120.dp)
                     ) {
@@ -562,6 +573,21 @@ fun TournamentBanner(
                                 fontSize = 9.sp
                             )
                         }
+                    }
+                    // Surface badge (colored by court type)
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(surfaceColor.copy(alpha = 0.22f), RoundedCornerShape(3.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = surfaceName.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = surfaceColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp
+                        )
                     }
                 }
             }

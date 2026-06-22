@@ -140,8 +140,16 @@ private fun StickyMatchBanner(
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable(onClick = onBack)
+                        .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+                ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Matches", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
                 Row(
                     modifier = Modifier.weight(1f),

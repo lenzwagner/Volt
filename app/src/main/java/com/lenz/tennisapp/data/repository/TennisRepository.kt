@@ -225,9 +225,7 @@ class TennisRepository @Inject constructor(
                     .find(eventTypeRaw)?.groupValues?.get(1)?.toIntOrNull()
                 if (mwPoints != null && mwPoints < 75) return@mapNotNull null
                 if (eventTypeRaw.contains("itf", ignoreCase = true)) return@mapNotNull null
-                // Drop qualifying tournaments
                 val leagueName = first.leagueName ?: ""
-                if (leagueName.contains("qualif", ignoreCase = true) || leagueId.contains("qualif", ignoreCase = true)) return@mapNotNull null
                 val isDoubles = eventTypeRaw.contains("double", ignoreCase = true) ||
                     leagueId.contains("double", ignoreCase = true)
                 val type = if (isDoubles) "Doubles" else "Singles"
@@ -246,6 +244,10 @@ class TennisRepository @Inject constructor(
                 }
                 val category = calendarEntry?.category ?: inferCategory(eventType, first.leagueName)
                 if (category.points < 75) return@mapNotNull null
+                // Keep qualifying ONLY for Grand Slams; drop it everywhere else.
+                val isQualif = leagueName.contains("qualif", ignoreCase = true) ||
+                    leagueId.contains("qualif", ignoreCase = true)
+                if (isQualif && category != TournamentCategory.GRAND_SLAM) return@mapNotNull null
                 Tournament(
                     id = leagueId,
                     name = first.leagueName,
@@ -500,6 +502,11 @@ class TennisRepository @Inject constructor(
 
         // Match major categories first
         if (t.contains("grand slam")) return TournamentCategory.GRAND_SLAM
+        // Name-based Grand Slam detection (e.g. "Wimbledon Qualifying")
+        if (n.contains("wimbledon") || n.contains("roland garros") || n.contains("french open") ||
+            n.contains("us open") || n.contains("australian open")) {
+            return TournamentCategory.GRAND_SLAM
+        }
         if (t.contains("masters 1000") || t.contains("atp 1000") || t.contains("wta 1000")) {
             return if (t.contains("wta")) TournamentCategory.WTA_1000 else TournamentCategory.ATP_MASTERS_1000
         }
