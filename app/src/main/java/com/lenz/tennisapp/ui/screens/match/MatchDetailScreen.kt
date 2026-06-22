@@ -535,7 +535,7 @@ private fun PlayerScoreRow(
 
         // Score area: set scores then separator then game points
         if (hasScore) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 sets.forEachIndexed { i, myScore ->
                     val oppScore = opponentSets.getOrElse(i) { 0 }
                     val complete = setsComplete.getOrElse(i) { false }
@@ -550,13 +550,13 @@ private fun PlayerScoreRow(
                     }
                     val weight = if (iWon) FontWeight.Black else if (!complete) FontWeight.Black else FontWeight.Normal
 
-                    Text(myScore.toString(), fontSize = 17.sp, fontWeight = weight, color = color)
+                    Text(myScore.toString(), fontSize = 21.sp, fontWeight = weight, color = color)
                 }
 
                 // Separator + game points
                 if (gamePoints.isNotBlank()) {
-                    Text("|", fontSize = 17.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 4.dp))
-                    Text(gamePoints, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("|", fontSize = 21.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 2.dp))
+                    Text(gamePoints, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
 
