@@ -298,13 +298,16 @@ class TennisRepository @Inject constructor(
                 val isQualif = leagueName.contains("qualif", ignoreCase = true) ||
                     leagueId.contains("qualif", ignoreCase = true) || roundsQualif
                 if (isQualif && category != TournamentCategory.GRAND_SLAM) return@mapNotNull null
+                val domainMatches = matches.map { it.toDomain() }
+                    .filter { it.status != MatchStatus.CANCELLED && it.status != MatchStatus.POSTPONED }
+                if (domainMatches.isEmpty()) return@mapNotNull null
                 Tournament(
                     id = leagueId,
                     name = first.leagueName,
                     location = calendarEntry?.location?.substringBefore(",")?.trim(),
                     category = category,
                     surface = calendarEntry?.surface ?: inferSurface(first.leagueName, eventType),
-                    matches = matches.map { it.toDomain() },
+                    matches = domainMatches,
                     type = type,
                     isQualifying = isQualif
                 )
@@ -608,8 +611,13 @@ class TennisRepository @Inject constructor(
      * (H2H, odds, prediction) loads in the background.
      */
     suspend fun getMatchDetailBase(matchId: String): Result<MatchDetail> {
-        // Return a richer cached version if we already have one.
-        matchDetailCache[matchId]?.let { return Result.Success(it) }
+        // Return cached version, but invalidate if match status changed to FINISHED since caching.
+        matchDetailCache[matchId]?.let { cached ->
+            if (cached.match.status == MatchStatus.FINISHED) return Result.Success(cached)
+            val currentStatus = matchDao.getMatchById(matchId)?.toDomain()?.status
+            if (currentStatus != MatchStatus.FINISHED) return Result.Success(cached)
+            matchDetailCache.remove(matchId) // fall through to re-fetch with final result
+        }
 
         val entity = matchDao.getMatchById(matchId) ?: return Result.Error("Match nicht gefunden")
         var match = entity.toDomain()
