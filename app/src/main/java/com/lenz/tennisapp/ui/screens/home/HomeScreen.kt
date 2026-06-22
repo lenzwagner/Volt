@@ -884,25 +884,12 @@ fun PlayerRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Player image with live-ranking badge (lime circle) on the avatar
-        Box(contentAlignment = Alignment.BottomCenter) {
-            com.lenz.tennisapp.ui.components.PlayerAvatarWithRanking(
-                player = player,
-                size = 28.dp,
-                rankingFontSize = 8.sp,
-                badgeSize = 13.dp
-            )
-            // Small badge at the bottom of avatar
-            Surface(
-                color = AuraLime,
-                shape = CircleShape,
-                modifier = Modifier.size(10.dp).offset(y = 3.dp),
-                border = BorderStroke(1.dp, AuraDeep)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("-", color = AuraDeep, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.offset(y = (-1).dp))
-                }
-            }
-        }
+        com.lenz.tennisapp.ui.components.PlayerAvatarWithRanking(
+            player = player,
+            size = 28.dp,
+            rankingFontSize = 8.sp,
+            badgeSize = 13.dp
+        )
 
         Spacer(Modifier.width(8.dp))
 
