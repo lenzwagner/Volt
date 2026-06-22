@@ -68,6 +68,26 @@ class TennisRepository @Inject constructor(
 
     suspend fun getAiPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? = getCachedPredictions()
 
+    suspend fun findMatchIdByPlayers(p1: String, p2: String): String? {
+        val dateStr = java.time.LocalDate.now().format(dateFormatter)
+        val matches = matchDao.getMatchesForDate(dateStr).first()
+        fun nk(raw: String): String {
+            val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            if (parts.isEmpty()) return ""
+            val isInitial = { t: String -> t.length <= 2 && (t.endsWith(".") || t.length == 1) }
+            val names = parts.filterNot(isInitial)
+            val last = (names.lastOrNull() ?: parts.last()).lowercase().trim('.', ',')
+            val firstInitial = (parts.filter(isInitial).firstOrNull()?.firstOrNull()
+                ?: names.firstOrNull()?.firstOrNull())?.lowercaseChar() ?: ' '
+            return "$last|$firstInitial"
+        }
+        val k1 = nk(p1); val k2 = nk(p2)
+        return matches.find { m ->
+            val hk = nk(m.homePlayer); val ak = nk(m.awayPlayer)
+            (hk == k1 && ak == k2) || (hk == k2 && ak == k1)
+        }?.id
+    }
+
     private suspend fun getCachedPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? {
         val now = System.currentTimeMillis()
         cachedPredictions?.let { if (now - predictionsCachedAt < PREDICTIONS_TTL_MS) return it }

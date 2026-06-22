@@ -38,6 +38,13 @@ class AiRecommendationsViewModel @Inject constructor(
 
     fun refresh() { load() }
 
+    fun findAndNavigate(p1: String, p2: String, onFound: (String) -> Unit) {
+        viewModelScope.launch {
+            val id = runCatching { repository.findMatchIdByPlayers(p1, p2) }.getOrNull()
+            if (id != null) onFound(id)
+        }
+    }
+
     fun setSortMode(mode: AiSortMode) {
         val sorted = _uiState.value.matches.sortedByDescending { it.sortScore(mode) }
         _uiState.value = _uiState.value.copy(sortMode = mode, allSorted = sorted)

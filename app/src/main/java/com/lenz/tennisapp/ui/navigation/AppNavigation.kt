@@ -237,7 +237,9 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         showHeader = false,
                         onMatchClick = { navController.navigate("match/$it") }
                     )
-                    2 -> AiRecommendationsScreen()
+                    2 -> AiRecommendationsScreen(
+                        onMatchClick = { navController.navigate("match/$it") }
+                    )
                     3 -> SettingsScreen(showHeader = false)
                 }
             }

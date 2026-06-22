@@ -49,6 +49,7 @@ private fun confStyle(confidence: Float) = when {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiRecommendationsScreen(
+    onMatchClick: (String) -> Unit = {},
     viewModel: AiRecommendationsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -136,7 +137,7 @@ fun AiRecommendationsScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(topPicks, key = { "${it.p1Fullname}_${it.p2Fullname}_top" }) { match ->
-                            TopPickCard(match)
+                            TopPickCard(match, onClick = { viewModel.findAndNavigate(match.p1Fullname, match.p2Fullname, onMatchClick) })
                         }
                     }
                 }
@@ -206,7 +207,7 @@ fun AiRecommendationsScreen(
 
             if (allExpanded) {
                 items(allSorted, key = { "${it.p1Fullname}_${it.p2Fullname}_all" }) { match ->
-                    CompactPickRow(match)
+                    CompactPickRow(match, onClick = { viewModel.findAndNavigate(match.p1Fullname, match.p2Fullname, onMatchClick) })
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
@@ -217,7 +218,7 @@ fun AiRecommendationsScreen(
 // ── Top Pick Carousel Card ─────────────────────────────────────────────────────
 
 @Composable
-private fun TopPickCard(match: PredictionMatchDto) {
+private fun TopPickCard(match: PredictionMatchDto, onClick: () -> Unit = {}) {
     val p1Wins = match.p1Prob >= match.p2Prob
     val favName = if (p1Wins) match.p1Fullname else match.p2Fullname
     val underName = if (p1Wins) match.p2Fullname else match.p1Fullname
@@ -230,6 +231,7 @@ private fun TopPickCard(match: PredictionMatchDto) {
     val animFav by animateFloatAsState(targetValue = favProb, animationSpec = tween(900), label = "fav")
 
     ElevatedCard(
+        onClick = onClick,
         modifier = Modifier.width(220.dp),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
@@ -305,7 +307,7 @@ private fun TopPickCard(match: PredictionMatchDto) {
 // ── Compact row for "Alle" section ────────────────────────────────────────────
 
 @Composable
-private fun CompactPickRow(match: PredictionMatchDto) {
+private fun CompactPickRow(match: PredictionMatchDto, onClick: () -> Unit = {}) {
     val p1Wins = match.p1Prob >= match.p2Prob
     val p1Pct = (match.p1Prob * 100).toInt()
     val p2Pct = (match.p2Prob * 100).toInt()
@@ -313,7 +315,7 @@ private fun CompactPickRow(match: PredictionMatchDto) {
 
     val animP1 by animateFloatAsState(targetValue = match.p1Prob, animationSpec = tween(700), label = "cp1")
 
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
