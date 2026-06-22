@@ -225,6 +225,33 @@ fun AiRecommendationsScreen(
                 }
             }
 
+            // ── Sort mode info card ──────────────────────────────────────
+            item {
+                val (title, desc) = when (state.sortMode) {
+                    AiSortMode.WEIGHTED   -> "Gewichtete Stärke" to "Kombiniert Konfidenz (45 %) und Wahrscheinlichkeitsdifferenz (55 %) — ausgewogene Gesamtbewertung."
+                    AiSortMode.CONFIDENCE -> "KI-Konfidenz" to "Wie sicher das Modell in seiner Vorhersage ist — unabhängig davon, wie knapp oder klar das Ergebnis erwartet wird."
+                    AiSortMode.ACCURACY   -> "Wahrscheinlichkeitsdifferenz" to "Wie groß der Abstand zwischen den Siegchancen beider Spieler ist — je höher, desto klarer der Favorit."
+                }
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = AuraPurple.copy(alpha = 0.06f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AuraPurple.copy(alpha = 0.12f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(Icons.Filled.AutoAwesome, null, tint = AuraPurple, modifier = Modifier.size(16.dp).padding(top = 2.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = AuraPurple)
+                            Text(desc, style = MaterialTheme.typography.labelSmall, color = AuraDeep.copy(alpha = 0.6f))
+                        }
+                    }
+                }
+            }
+
             // ── All Picks expandable ─────────────────────────────────────
             item {
                 Row(

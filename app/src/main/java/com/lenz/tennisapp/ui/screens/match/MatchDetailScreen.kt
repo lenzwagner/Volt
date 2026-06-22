@@ -398,12 +398,18 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
         (hasScoreData && match.status != MatchStatus.FINISHED)
     val scoreParts = match.score?.takeIf { it.isNotBlank() && it != "-" }?.split(",") ?: emptyList()
 
-    data class SetInfo(val s1: Int, val s2: Int, val complete: Boolean)
+    fun extractTb(raw: String): Int? {
+        val start = raw.indexOf('('); val end = raw.indexOf(')')
+        if (start >= 0 && end > start) return raw.substring(start + 1, end).toIntOrNull()
+        return null
+    }
+    data class SetInfo(val s1: Int, val s2: Int, val complete: Boolean, val tb1: Int? = null, val tb2: Int? = null)
     val sets = scoreParts.map { s ->
-        val p = s.split("-")
-        val v1 = parseSetScore(p.getOrNull(0) ?: "0")
-        val v2 = parseSetScore(p.getOrNull(1) ?: "0")
-        SetInfo(v1, v2, isSetComplete(v1, v2))
+        val p = s.trim().split("-")
+        val raw1 = p.getOrNull(0)?.trim() ?: "0"
+        val raw2 = p.getOrNull(1)?.trim() ?: "0"
+        val v1 = parseSetScore(raw1); val v2 = parseSetScore(raw2)
+        SetInfo(v1, v2, isSetComplete(v1, v2), extractTb(raw1), extractTb(raw2))
     }
 
     val p1Sets = sets.count { it.complete && it.s1 > it.s2 }
@@ -446,6 +452,7 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
             sets = displaySets.map { it.s1 },
             opponentSets = displaySets.map { it.s2 },
             setsComplete = displaySets.map { it.complete },
+            tiebreakPoints = displaySets.map { it.tb1 },
             totalSetsWon = p1Sets,
             gamePoints = g1,
             hasScore = hasScoreData,
@@ -461,6 +468,7 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
             sets = displaySets.map { it.s2 },
             opponentSets = displaySets.map { it.s1 },
             setsComplete = displaySets.map { it.complete },
+            tiebreakPoints = displaySets.map { it.tb2 },
             totalSetsWon = p2Sets,
             gamePoints = g2,
             hasScore = hasScoreData,
@@ -474,9 +482,10 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
 private fun PlayerScoreRow(
     player: Player,
     isServing: Boolean,
-    sets: List<Int>,         // this player's score per set
-    opponentSets: List<Int>, // opponent's score per set
+    sets: List<Int>,
+    opponentSets: List<Int>,
     setsComplete: List<Boolean>,
+    tiebreakPoints: List<Int?> = emptyList(),
     totalSetsWon: Int,
     gamePoints: String,
     hasScore: Boolean,
@@ -543,14 +552,21 @@ private fun PlayerScoreRow(
                     val oppWon = complete && oppScore > myScore
 
                     val color = when {
-                        !complete              -> Color(0xFFE53935)          // current set → red
-                        iWon                  -> Color.White                 // set winner → bright
-                        oppWon                -> Color.White.copy(alpha = 0.3f) // set loser → dim
-                        else                  -> Color.White.copy(alpha = 0.3f)
+                        !complete -> Color(0xFFE53935)
+                        iWon      -> Color.White
+                        else      -> Color.White.copy(alpha = 0.3f)
                     }
                     val weight = if (iWon) FontWeight.Black else if (!complete) FontWeight.Black else FontWeight.Normal
+                    val myTb = tiebreakPoints.getOrElse(i) { null }
 
-                    Text(myScore.toString(), fontSize = 21.sp, fontWeight = weight, color = color)
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(myScore.toString(), fontSize = 21.sp, fontWeight = weight, color = color)
+                        if (myTb != null && complete) {
+                            Text("$myTb", fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                color = color.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(top = 3.dp, start = 1.dp))
+                        }
+                    }
                 }
 
                 // Separator + game points (fixed-width box so 0/15/30/40/AD don't shift layout)
