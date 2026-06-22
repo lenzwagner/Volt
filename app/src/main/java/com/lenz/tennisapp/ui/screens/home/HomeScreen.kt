@@ -134,7 +134,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(bottom = 160.dp)
                     ) {
                         tournaments.forEach { tournament ->
-                            item(key = "tour_${tournament.id}") {
+                            item(key = "tour_${tournament.id}", contentType = "banner") {
                                 val expanded = expandedMap[tournament.id] ?: true
                                 TournamentBanner(
                                     tournament = tournament,
@@ -144,7 +144,11 @@ fun HomeScreen(
                             }
 
                             if (expandedMap[tournament.id] != false) {
-                                items(tournament.matches, key = { "match_${it.id}" }) { match ->
+                                items(
+                                    tournament.matches,
+                                    key = { "match_${it.id}" },
+                                    contentType = { "match" }
+                                ) { match ->
                                     MatchRow(
                                         match = match,
                                         onClick = { onMatchClick(match.id) },

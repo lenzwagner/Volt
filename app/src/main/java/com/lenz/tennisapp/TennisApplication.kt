@@ -3,6 +3,13 @@ package com.lenz.tennisapp
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.disk.DiskCache
+import coil3.disk.directory
+import coil3.memory.MemoryCache
+import coil3.request.crossfade
 import com.lenz.tennisapp.data.datastore.ApiKeyStore
 import com.lenz.tennisapp.notification.NotificationHelper
 import com.lenz.tennisapp.ui.theme.CourtType
@@ -18,7 +25,25 @@ import java.util.Calendar
 import javax.inject.Inject
 
 @HiltAndroidApp
-class TennisApplication : Application(), Configuration.Provider {
+class TennisApplication : Application(), Configuration.Provider, SingletonImageLoader.Factory {
+
+    // Player avatars repeat across lists; a generous memory + disk cache keeps
+    // scrolling smooth and avoids re-decoding/re-downloading the same images.
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .crossfade(false)
+            .memoryCache {
+                MemoryCache.Builder()
+                    .maxSizePercent(context, 0.25)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(80L * 1024 * 1024)
+                    .build()
+            }
+            .build()
 
     companion object {
         /** Global court background used across all screens for consistency. */
@@ -45,8 +70,11 @@ class TennisApplication : Application(), Configuration.Provider {
         super.onCreate()
         // Randomized in initializer
 
-        // Setup Timber for crash logging
-        Timber.plant(Timber.DebugTree())
+        // Logging only in debug — DebugTree string-building adds overhead on hot
+        // paths (list grouping runs on every poll) and isn't needed in release.
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
         setupCrashHandler()
 
         NotificationHelper.createChannels(this)
