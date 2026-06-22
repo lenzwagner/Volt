@@ -7,7 +7,8 @@ data class Tournament(
     val category: TournamentCategory,
     val surface: Surface,
     val matches: List<TennisMatch>,
-    val type: String? = null
+    val type: String? = null,
+    val isQualifying: Boolean = false
 )
 
 data class TennisMatch(

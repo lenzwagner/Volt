@@ -112,7 +112,15 @@ fun HomeScreen(
                 var firstFilterRun by remember { mutableStateOf(true) }
                 LaunchedEffect(liveFilter) {
                     if (firstFilterRun) { firstFilterRun = false; return@LaunchedEffect }
-                    listState.animateScrollToItem(0)
+                    // Soft glide: if we're deep in the list, snap closer first so the
+                    // final animated stretch is short and smooth, not a long abrupt fling.
+                    if (listState.firstVisibleItemIndex > 6) {
+                        listState.scrollToItem(6)
+                    }
+                    listState.animateScrollToItem(
+                        index = 0,
+                        scrollOffset = 0
+                    )
                 }
 
                 PullToRefreshBox(
@@ -588,6 +596,22 @@ fun TournamentBanner(
                             fontWeight = FontWeight.Bold,
                             fontSize = 9.sp
                         )
+                    }
+                    if (tournament.isQualifying) {
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(AuraLime.copy(alpha = 0.22f), RoundedCornerShape(3.dp))
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "QUALI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AuraLime,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp
+                            )
+                        }
                     }
                 }
             }

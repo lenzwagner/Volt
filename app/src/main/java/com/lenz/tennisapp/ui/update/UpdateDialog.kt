@@ -2,7 +2,10 @@ package com.lenz.tennisapp.ui.update
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,33 +29,56 @@ fun UpdateGate(viewModel: UpdateViewModel = hiltViewModel()) {
 
     AlertDialog(
         onDismissRequest = { if (!downloading) viewModel.dismiss() },
-        title = { Text("Update verfügbar", fontWeight = FontWeight.Bold) },
+        shape = RoundedCornerShape(28.dp),
+        tonalElevation = 6.dp,
+        icon = {
+            Icon(
+                Icons.Rounded.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(
+                "Update verfügbar",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
         text = {
-            Column(modifier = Modifier.heightIn(max = 320.dp)) {
-                Text("Version ${info.versionName}", fontWeight = FontWeight.SemiBold)
-                if (info.apkSizeBytes > 0) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        "${"%.1f".format(info.apkSizeBytes / 1_000_000.0)} MB",
-                        fontSize = 12.sp
-                    )
-                }
+            Column(modifier = Modifier.heightIn(max = 340.dp)) {
+                AssistChipRow(versionName = info.versionName, sizeBytes = info.apkSizeBytes)
                 if (info.releaseNotes.isNotBlank()) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Neuerungen",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         info.releaseNotes,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     )
                 }
             }
         },
         confirmButton = {
-            TextButton(
+            FilledTonalButton(
                 onClick = { viewModel.startUpdate() },
                 enabled = !downloading
             ) {
-                Text(if (downloading) "Lädt…" else "Herunterladen")
+                if (downloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Lädt…")
+                } else {
+                    Text("Herunterladen")
+                }
             }
         },
         dismissButton = {
@@ -61,4 +87,22 @@ fun UpdateGate(viewModel: UpdateViewModel = hiltViewModel()) {
             }
         }
     )
+}
+
+@Composable
+private fun AssistChipRow(versionName: String, sizeBytes: Long) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AssistChip(
+            onClick = {},
+            enabled = false,
+            label = { Text("Version $versionName") }
+        )
+        if (sizeBytes > 0) {
+            AssistChip(
+                onClick = {},
+                enabled = false,
+                label = { Text("${"%.1f".format(sizeBytes / 1_000_000.0)} MB") }
+            )
+        }
+    }
 }

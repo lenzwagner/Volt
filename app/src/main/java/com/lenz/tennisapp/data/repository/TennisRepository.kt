@@ -245,8 +245,14 @@ class TennisRepository @Inject constructor(
                 val category = calendarEntry?.category ?: inferCategory(eventType, first.leagueName)
                 if (category.points < 75) return@mapNotNull null
                 // Keep qualifying ONLY for Grand Slams; drop it everywhere else.
+                // Detect qualifying from the league name/id OR from the match rounds
+                // (GS qualifying is often listed under the plain "Wimbledon" name).
+                val roundsQualif = matches.isNotEmpty() && matches.all {
+                    val r = it.round?.lowercase() ?: ""
+                    r.contains("qualif") || r.contains("pre-q") || r.startsWith("q")
+                }
                 val isQualif = leagueName.contains("qualif", ignoreCase = true) ||
-                    leagueId.contains("qualif", ignoreCase = true)
+                    leagueId.contains("qualif", ignoreCase = true) || roundsQualif
                 if (isQualif && category != TournamentCategory.GRAND_SLAM) return@mapNotNull null
                 Tournament(
                     id = leagueId,
@@ -255,7 +261,8 @@ class TennisRepository @Inject constructor(
                     category = category,
                     surface = calendarEntry?.surface ?: inferSurface(first.leagueName, eventType),
                     matches = matches.map { it.toDomain() },
-                    type = type
+                    type = type,
+                    isQualifying = isQualif
                 )
             }
             .sortedWith(compareBy(
