@@ -778,19 +778,33 @@ class TennisRepository @Inject constructor(
             )
         }
 
-        // External AI prediction — use already-fetched parallel result
+        // External AI prediction — fuzzy match by last name + first initial,
+        // because the JSON mixes full names ("Tomasz Berkieta") and abbreviated
+        // ones ("A. Tolev"). Order-independent.
         val externalPrediction = try {
             val resp = parallel.predictionsResp
             if (resp != null && resp.success && resp.data != null) {
-                val p1Name = match.homePlayer.name.trim()
-                val p2Name = match.awayPlayer.name.trim()
+                // key = "lastname|firstinitial", lowercase. Handles both
+                // "Taylor Fritz", "T. Fritz" and "Carballes Baena R." formats.
+                fun nameKey(raw: String): String {
+                    val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                    if (parts.isEmpty()) return ""
+                    val isInitial = { t: String -> t.length <= 2 && (t.endsWith(".") || t.length == 1) }
+                    val initials = parts.filter(isInitial)
+                    val names = parts.filterNot(isInitial)
+                    val last = (names.lastOrNull() ?: parts.last()).lowercase().trim('.', ',')
+                    val firstInitial = (initials.firstOrNull()?.firstOrNull()
+                        ?: names.firstOrNull()?.firstOrNull())?.lowercaseChar() ?: ' '
+                    return "$last|$firstInitial"
+                }
+                val k1 = nameKey(match.homePlayer.name)
+                val k2 = nameKey(match.awayPlayer.name)
                 resp.data.matches.firstOrNull { m ->
-                    (m.p1Fullname.trim().equals(p1Name, ignoreCase = true) &&
-                     m.p2Fullname.trim().equals(p2Name, ignoreCase = true)) ||
-                    (m.p1Fullname.trim().equals(p2Name, ignoreCase = true) &&
-                     m.p2Fullname.trim().equals(p1Name, ignoreCase = true))
+                    val mk1 = nameKey(m.p1Fullname)
+                    val mk2 = nameKey(m.p2Fullname)
+                    (mk1 == k1 && mk2 == k2) || (mk1 == k2 && mk2 == k1)
                 }?.let { m ->
-                    val isSwapped = m.p1Fullname.trim().equals(p2Name, ignoreCase = true)
+                    val isSwapped = nameKey(m.p1Fullname) == k2
                     val p1Prob = if (isSwapped) m.p2Prob else m.p1Prob
                     val p2Prob = if (isSwapped) m.p1Prob else m.p2Prob
                     MatchPrediction(

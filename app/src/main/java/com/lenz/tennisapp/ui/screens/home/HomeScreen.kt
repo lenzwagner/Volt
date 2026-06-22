@@ -131,7 +131,7 @@ fun HomeScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 120.dp)
+                        contentPadding = PaddingValues(bottom = 160.dp)
                     ) {
                         tournaments.forEach { tournament ->
                             item(key = "tour_${tournament.id}") {
