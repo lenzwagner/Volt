@@ -35,14 +35,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lenz.tennisapp.data.api.PredictionMatchDto
 import com.lenz.tennisapp.ui.theme.*
-import kotlin.math.abs
 
-private fun PredictionMatchDto.score(): Float {
-    val probDiff = abs(p1Prob - p2Prob)
-    return 0.45f * confidence + 0.55f * probDiff
-}
-
-private fun PredictionMatchDto.isTopPick(): Boolean = score() >= 0.28f
+private fun PredictionMatchDto.isTopPick(): Boolean =
+    (0.45f * confidence + 0.55f * kotlin.math.abs(p1Prob - p2Prob)) >= 0.28f
 
 private data class ConfStyle(val label: String, val color: Color)
 private fun confStyle(confidence: Float) = when {
@@ -59,8 +54,12 @@ fun AiRecommendationsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var allExpanded by remember { mutableStateOf(false) }
 
-    val topPicks = remember(state.matches) { state.matches.filter { it.isTopPick() }.sortedByDescending { it.score() } }
-    val allSorted = remember(state.matches) { state.matches.sortedByDescending { it.score() } }
+    val topPicks = remember(state.matches, state.sortMode) {
+        state.matches.filter { it.isTopPick() }.sortedByDescending { it.sortScore(state.sortMode) }
+    }
+    val allSorted = remember(state.matches, state.sortMode) {
+        state.matches.sortedByDescending { it.sortScore(state.sortMode) }
+    }
 
     PullToRefreshBox(
         isRefreshing = state.isLoading,
@@ -95,15 +94,35 @@ fun AiRecommendationsScreen(
                 }
             }
 
-            // ── Loading / Error / Empty ───────────────────────────────────
-            if (state.isLoading && state.matches.isEmpty()) {
+            // ── Sort toggle ──────────────────────────────────────────────
+            if (state.matches.isNotEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().padding(64.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AuraPurple)
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                    ) {
+                        AiSortMode.entries.forEachIndexed { idx, mode ->
+                            SegmentedButton(
+                                selected = state.sortMode == mode,
+                                onClick = { viewModel.setSortMode(mode) },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = AiSortMode.entries.size),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = AuraPurple,
+                                    activeContentColor = Color.White,
+                                    inactiveContainerColor = Color.Transparent,
+                                    inactiveContentColor = AuraDeep.copy(alpha = 0.5f),
+                                    activeBorderColor = AuraPurple,
+                                    inactiveBorderColor = AuraDeep.copy(alpha = 0.1f)
+                                )
+                            ) {
+                                Text(mode.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
+                    Spacer(Modifier.height(4.dp))
                 }
-                return@LazyColumn
             }
+
+            // ── Loading / Error / Empty ───────────────────────────────────
             if (state.error != null) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
