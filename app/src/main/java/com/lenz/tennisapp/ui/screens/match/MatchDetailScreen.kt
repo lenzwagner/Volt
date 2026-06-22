@@ -560,14 +560,6 @@ private fun PlayerScoreRow(
                 }
             }
 
-            // Sets won count (bold, right-most)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                totalSetsWon.toString(),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                color = if (totalSetsWon > 0) Color.White else Color.White.copy(alpha = 0.2f)
-            )
         } else {
             // No score yet — VS
             Text("VS", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.2f))
