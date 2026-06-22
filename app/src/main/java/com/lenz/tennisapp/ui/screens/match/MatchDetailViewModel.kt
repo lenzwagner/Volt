@@ -93,7 +93,38 @@ class MatchDetailViewModel @Inject constructor(
             Timber.d("Loading match detail for ID: $matchId (silent=$isSilent, forceOdds=$forceRefreshOdds)")
             val predMap = predictionRepository.getPredictionMap().first()
 
-            // Show loaded state immediately with basic match info
+            // Silent poll (every 2s): only patch the live score from DB. Don't
+            // re-run the network (H2H/odds/prediction) — keep the loaded values.
+            val current = _uiState.value
+            if (isSilent && current is MatchDetailUiState.Loaded) {
+                val fresh = repository.getFreshMatch(matchId)
+                if (fresh != null) {
+                    // Keep enriched players; only update score/status/game fields.
+                    val merged = current.detail.match.copy(
+                        score = fresh.score,
+                        gameScore = fresh.gameScore,
+                        status = fresh.status,
+                        isHomeServing = fresh.isHomeServing,
+                        setScores = fresh.setScores,
+                        finalResult = fresh.finalResult,
+                        winnerKey = fresh.winnerKey
+                    )
+                    _uiState.value = current.copy(
+                        detail = current.detail.copy(match = merged),
+                        userPrediction = predMap[matchId]
+                    )
+                }
+                return
+            }
+
+            // Instant render with DB-only data while the full version loads.
+            if (!isSilent && current !is MatchDetailUiState.Loaded) {
+                (repository.getMatchDetailBase(matchId) as? Result.Success)?.let {
+                    _uiState.value = MatchDetailUiState.Loaded(it.data, predMap[matchId])
+                }
+            }
+
+            // Full detail (H2H, odds, prediction) — patches the view when ready
             val result = repository.getMatchDetail(matchId, forceRefreshOdds)
 
             _uiState.value = when (result) {

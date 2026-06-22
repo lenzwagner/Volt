@@ -225,18 +225,19 @@ private fun MatchDetailContent(
 
         item { Spacer(Modifier.height(12.dp)) }
 
-        // ── AI Prediction ────────────────────────────────────────────────────
-        item {
-            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
-                AIPredictionSection(
-                    prediction = detail.prediction,
-                    p1Name = match.homePlayer.name,
-                    p2Name = match.awayPlayer.name
-                )
+        // ── AI Prediction (only when external prediction exists) ─────────────
+        detail.prediction?.let { pred ->
+            item {
+                SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    AIPredictionSection(
+                        prediction = pred,
+                        p1Name = match.homePlayer.name,
+                        p2Name = match.awayPlayer.name
+                    )
+                }
             }
+            item { Spacer(Modifier.height(12.dp)) }
         }
-
-        item { Spacer(Modifier.height(12.dp)) }
 
         // ── Wettquoten ───────────────────────────────────────────────────────
         item {

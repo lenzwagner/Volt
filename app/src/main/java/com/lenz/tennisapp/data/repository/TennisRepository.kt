@@ -540,6 +540,64 @@ class TennisRepository @Inject constructor(
         }
     }
 
+    /** Fresh live-score state straight from the DB (no cache) — for 2s polling. */
+    suspend fun getFreshMatch(matchId: String): TennisMatch? =
+        matchDao.getMatchById(matchId)?.toDomain()
+
+    /**
+     * Instant, DB-only match detail: player enrichment, ELO, recent matches.
+     * No network — used to render the page immediately while the full version
+     * (H2H, odds, prediction) loads in the background.
+     */
+    suspend fun getMatchDetailBase(matchId: String): Result<MatchDetail> {
+        // Return a richer cached version if we already have one.
+        matchDetailCache[matchId]?.let { return Result.Success(it) }
+
+        val entity = matchDao.getMatchById(matchId) ?: return Result.Error("Match nicht gefunden")
+        var match = entity.toDomain()
+
+        val p1Entity = playerDao.getByKey(entity.homePlayerKey)
+        val p2Entity = playerDao.getByKey(entity.awayPlayerKey)
+        if (p1Entity != null) {
+            match = match.copy(homePlayer = match.homePlayer.copy(
+                ranking = p1Entity.liveRanking ?: p1Entity.currentRanking ?: match.homePlayer.ranking,
+                atpPoints = p1Entity.liveRankingPoints ?: p1Entity.currentRankingPoints,
+                nationality = p1Entity.nationality,
+                logoUrl = p1Entity.photoUrl ?: match.homePlayer.logoUrl,
+                careerHighRanking = p1Entity.careerHighRanking,
+                birthDate = p1Entity.birthDate,
+                prizeMoneyYtd = p1Entity.prizeMoneyYtd
+            ))
+        }
+        if (p2Entity != null) {
+            match = match.copy(awayPlayer = match.awayPlayer.copy(
+                ranking = p2Entity.liveRanking ?: p2Entity.currentRanking ?: match.awayPlayer.ranking,
+                atpPoints = p2Entity.liveRankingPoints ?: p2Entity.currentRankingPoints,
+                nationality = p2Entity.nationality,
+                logoUrl = p2Entity.photoUrl ?: match.awayPlayer.logoUrl,
+                careerHighRanking = p2Entity.careerHighRanking,
+                birthDate = p2Entity.birthDate,
+                prizeMoneyYtd = p2Entity.prizeMoneyYtd
+            ))
+        }
+        fun PlayerEntity.toEloProfile() = if (eloRating != null) PlayerEloProfile(
+            eloOverall = eloRating, eloClay = eloClay ?: eloRating, eloGrass = eloGrass ?: eloRating,
+            eloHard = eloHard ?: eloRating, eloIndoor = eloHard ?: eloRating, matchesPlayed = 0
+        ) else null
+
+        return Result.Success(MatchDetail(
+            match = match,
+            stats = emptyList(),
+            h2h = H2HResult(match.homePlayer.name, match.awayPlayer.name, 0, 0, emptyList()),
+            odds = emptyList(),
+            prediction = null,
+            player1Elo = p1Entity?.toEloProfile(),
+            player2Elo = p2Entity?.toEloProfile(),
+            homeRecentMatches = getLocalPlayerMatches(entity.homePlayerKey),
+            awayRecentMatches = getLocalPlayerMatches(entity.awayPlayerKey)
+        ))
+    }
+
     suspend fun getMatchDetail(
         matchId: String,
         forceRefreshOdds: Boolean = false,
@@ -734,7 +792,8 @@ class TennisRepository @Inject constructor(
                 }
             } else null
         } catch (e: Exception) { null }
-        val prediction = externalPrediction ?: predictor.predict(match, h2hResult, odds)
+        // External prediction only — no internal fallback. Null = section hidden.
+        val prediction = externalPrediction
 
         val detail = MatchDetail(
             match = match,

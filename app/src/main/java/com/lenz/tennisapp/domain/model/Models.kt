@@ -55,7 +55,7 @@ data class MatchDetail(
     val stats: List<StatLine>,
     val h2h: H2HResult,
     val odds: List<BookmakerOdds>,
-    val prediction: MatchPrediction,
+    val prediction: MatchPrediction? = null,
     val player1Elo: PlayerEloProfile? = null,
     val player2Elo: PlayerEloProfile? = null,
     val homeRecentMatches: List<TennisMatch> = emptyList(),
