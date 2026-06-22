@@ -3,6 +3,7 @@ package com.lenz.tennisapp.ui.screens.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lenz.tennisapp.data.repository.PlayerRepository
+import com.lenz.tennisapp.data.repository.PredictionRepository
 import com.lenz.tennisapp.data.repository.TennisRepository
 import com.lenz.tennisapp.domain.model.*
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +24,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TennisRepository,
-    private val playerRepository: PlayerRepository
+    private val playerRepository: PlayerRepository,
+    private val predictionRepository: PredictionRepository
 ) : ViewModel() {
 
     private val _tourFilter = MutableStateFlow(TourFilter.ALL)
@@ -106,6 +108,7 @@ class HomeViewModel @Inject constructor(
         refresh()
         startPolling()
         startPrefetch()
+        viewModelScope.launch { predictionRepository.resolvePending() }
     }
 
     // After the main page has data, warm match-detail caches (H2H + AI predictions,

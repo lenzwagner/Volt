@@ -84,6 +84,7 @@ class PredictionRepository @Inject constructor(
     /**
      * Resolve any pending pick whose match has finished: mark it correct/incorrect
      * by comparing the picked winner to the match's actual winnerId.
+     * Falls back to set-count inference if winnerId is missing from the API response.
      */
     suspend fun resolvePending() {
         val finishedStatuses = setOf("finished", "retired", "walkover")
@@ -91,13 +92,34 @@ class PredictionRepository @Inject constructor(
         for (p in pending) {
             val match = matchDao.getMatchById(p.matchId) ?: continue
             val isFinished = match.status.lowercase() in finishedStatuses
-            val winnerKey = match.winnerId
-            if (!isFinished || winnerKey.isNullOrBlank()) continue
+            if (!isFinished) continue
+            val winnerKey = match.winnerId?.takeIf { it.isNotBlank() }
+                ?: inferWinnerFromScore(match.finalResult, match.homePlayerKey, match.awayPlayerKey)
+            if (winnerKey.isNullOrBlank()) continue
             val correct = winnerKey == p.predictedWinnerKey
             val actualName = if (winnerKey == p.homePlayerKey) p.homePlayerName else p.awayPlayerName
             dao.resolveResult(p.matchId, correct, winnerKey, actualName)
-            Timber.d("Resolved prediction ${p.matchId}: correct=$correct")
+            Timber.d("Resolved prediction ${p.matchId}: correct=$correct winner=$winnerKey")
         }
+    }
+
+    private fun inferWinnerFromScore(score: String?, homeKey: String, awayKey: String): String? {
+        if (score.isNullOrBlank()) return null
+        return try {
+            var homeSets = 0; var awaySets = 0
+            for (set in score.split(",")) {
+                val parts = set.trim().split("-")
+                if (parts.size < 2) continue
+                val h = parts[0].trim().takeWhile { it.isDigit() }.toIntOrNull() ?: continue
+                val a = parts[1].trim().takeWhile { it.isDigit() }.toIntOrNull() ?: continue
+                if (h > a) homeSets++ else if (a > h) awaySets++
+            }
+            when {
+                homeSets > awaySets -> homeKey
+                awaySets > homeSets -> awayKey
+                else -> null
+            }
+        } catch (e: Exception) { null }
     }
 
     private fun UserPredictionEntity.toDomain() = UserPrediction(
