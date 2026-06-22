@@ -41,6 +41,7 @@ import java.util.*
 @Composable
 fun PredictionsScreen(
     showHeader: Boolean = true,
+    onMatchClick: (String) -> Unit = {},
     viewModel: PredictionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -153,7 +154,7 @@ fun PredictionsScreen(
                             )
                         }
                         items(preds, key = { it.matchId }) { prediction ->
-                            PredictionRow(prediction)
+                            PredictionRow(prediction, onClick = { onMatchClick(prediction.matchId) })
                             HorizontalDivider(
                                 modifier = Modifier.padding(horizontal = 16.dp),
                                 color    = MaterialTheme.colorScheme.outlineVariant
@@ -256,7 +257,7 @@ private fun StatChip(
 // ─── Prediction row ────────────────────────────────────────────────────────────
 
 @Composable
-private fun PredictionRow(prediction: UserPrediction) {
+private fun PredictionRow(prediction: UserPrediction, onClick: () -> Unit = {}) {
     val bgColor = when (prediction.isCorrect) {
         true  -> MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
         false -> MaterialTheme.colorScheme.error.copy(alpha = 0.05f)
@@ -265,6 +266,7 @@ private fun PredictionRow(prediction: UserPrediction) {
 
     Surface(
         color = bgColor,
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

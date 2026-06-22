@@ -229,7 +229,10 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         },
                         showHeader = false
                     )
-                    1 -> PredictionsScreen(showHeader = false)
+                    1 -> PredictionsScreen(
+                        showHeader = false,
+                        onMatchClick = { navController.navigate("match/$it") }
+                    )
                     2 -> SettingsScreen(showHeader = false)
                 }
             }
