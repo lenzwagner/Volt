@@ -883,23 +883,32 @@ fun PlayerRow(
         modifier = Modifier.height(32.dp), // Match ScoreText height
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Player image with live-ranking badge (lime circle) on the avatar
+        // Player image; single ranking badge centered at the bottom (6 o'clock)
         Box(contentAlignment = Alignment.BottomCenter) {
             com.lenz.tennisapp.ui.components.PlayerAvatarWithRanking(
                 player = player,
                 size = 28.dp,
-                rankingFontSize = 8.sp,
-                badgeSize = 13.dp
+                showRanking = false
             )
-            // Small badge at the bottom of avatar
+            val rankText = player.ranking?.toString() ?: "-"
+            val rankFontSize = when (rankText.length) {
+                4 -> 6.sp
+                3 -> 7.sp
+                else -> 8.sp
+            }
             Surface(
                 color = AuraLime,
                 shape = CircleShape,
-                modifier = Modifier.size(10.dp).offset(y = 3.dp),
+                modifier = Modifier.size(14.dp).offset(y = 4.dp),
                 border = BorderStroke(1.dp, AuraDeep)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("-", color = AuraDeep, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.offset(y = (-1).dp))
+                    Text(
+                        rankText,
+                        color = AuraDeep,
+                        fontSize = rankFontSize,
+                        fontWeight = FontWeight.Black
+                    )
                 }
             }
         }

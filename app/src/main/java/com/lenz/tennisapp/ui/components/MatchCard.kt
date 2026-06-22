@@ -69,7 +69,8 @@ fun PlayerAvatarWithRanking(
     player: Player,
     size: androidx.compose.ui.unit.Dp = 24.dp,
     rankingFontSize: androidx.compose.ui.unit.TextUnit = 8.sp,
-    badgeSize: androidx.compose.ui.unit.Dp = 12.dp
+    badgeSize: androidx.compose.ui.unit.Dp = 12.dp,
+    showRanking: Boolean = true
 ) {
     Box(contentAlignment = Alignment.BottomEnd) {
         if (!player.logoUrl.isNullOrBlank()) {
@@ -100,7 +101,7 @@ fun PlayerAvatarWithRanking(
             }
         }
 
-        player.ranking?.let { rank ->
+        player.ranking?.takeIf { showRanking }?.let { rank ->
             val digits = rank.toString().length
             val actualFontSize = when {
                 digits >= 3 -> rankingFontSize * 0.72f
