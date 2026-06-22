@@ -109,6 +109,7 @@ class HomeViewModel @Inject constructor(
         startPolling()
         startPrefetch()
         viewModelScope.launch { predictionRepository.resolvePending() }
+        viewModelScope.launch { runCatching { repository.getAiPredictions() } }
     }
 
     // After the main page has data, warm match-detail caches (H2H + AI predictions,
