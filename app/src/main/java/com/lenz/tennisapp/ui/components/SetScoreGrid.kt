@@ -106,12 +106,19 @@ fun SetScoreGrid(
             }
             if (showGame) {
                 Text(
+                    "|",
+                    fontSize = gameSize,
+                    color = AuraDeep.copy(alpha = 0.25f),
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+                Text(
                     text = gHome ?: "0",
                     fontSize = gameSize,
-                    color = AuraPurple,
+                    color = Color(0xFFE53935),
                     fontWeight = FontWeight.Black,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.padding(start = 2.dp).width(28.dp)
+                    modifier = Modifier.width(28.dp)
                 )
             }
         }
@@ -138,12 +145,19 @@ fun SetScoreGrid(
             }
             if (showGame) {
                 Text(
+                    "|",
+                    fontSize = gameSize,
+                    color = AuraDeep.copy(alpha = 0.25f),
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier.padding(horizontal = 2.dp)
+                )
+                Text(
                     text = gAway ?: "0",
                     fontSize = gameSize,
-                    color = AuraDeep.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE53935),
+                    fontWeight = FontWeight.Black,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.padding(start = 2.dp).width(28.dp)
+                    modifier = Modifier.width(28.dp)
                 )
             }
         }
@@ -177,13 +191,13 @@ private fun SetDigit(
 
     val color = when {
         isWinner  -> AuraDeep
-        isCurrent -> AuraPurple
+        isCurrent -> Color(0xFFE53935)
         else      -> Color.LightGray
     }
     val weight = when {
         isWinner  -> FontWeight.Black
-        isCurrent -> FontWeight.Bold
-        else      -> FontWeight.Medium
+        isCurrent -> FontWeight.Black
+        else      -> FontWeight.Normal
     }
 
     Row(
