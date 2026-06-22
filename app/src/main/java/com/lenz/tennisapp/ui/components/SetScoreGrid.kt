@@ -57,14 +57,30 @@ fun SetScoreGrid(
         }
     }
 
+    // When live, check if the last set is already completed (both sides resolved).
+    // A set is done when one side reached ≥6 games and leads by ≥2, or either side has ≥7.
+    fun isSetComplete(h: Int?, a: Int?): Boolean {
+        if (h == null || a == null) return false
+        return (h >= 6 && a <= 4 && h - a >= 2) ||
+               (a >= 6 && h <= 4 && a - h >= 2) ||
+               h >= 7 || a >= 7
+    }
+
     val lastSet = sets.lastOrNull()
-    val inTiebreak = isLive && parseGames(lastSet?.first ?: "") == 6 && parseGames(lastSet?.second ?: "") == 6
+    val lastH = parseGames(lastSet?.first ?: "")
+    val lastA = parseGames(lastSet?.second ?: "")
+    val lastSetDone = isLive && isSetComplete(lastH, lastA)
+
+    // If last set is complete while match is live, the new set is 0-0 — append it.
+    val displaySets = if (lastSetDone) sets + Pair("0", "0") else sets
+
+    val inTiebreak = isLive && !lastSetDone &&
+            parseGames(lastSet?.first ?: "") == 6 && parseGames(lastSet?.second ?: "") == 6
 
     val gParts = gameScore?.split("-")
     val gHome  = gParts?.getOrNull(0)?.trim()?.ifBlank { "0" }
     val gAway  = gParts?.getOrNull(1)?.trim()?.ifBlank { "0" }
-    // When live but no game score yet, show "0" for both so rows stay same width
-    val showGame = isLive && gameScore != null
+    val showGame = isLive && (gameScore != null || lastSetDone)
 
     Column(
         modifier = modifier,
@@ -75,8 +91,8 @@ fun SetScoreGrid(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            sets.forEachIndexed { i, (homeStr, awayStr) ->
-                val isCurrentSet = isLive && i == sets.size - 1
+            displaySets.forEachIndexed { i, (homeStr, awayStr) ->
+                val isCurrentSet = isLive && i == displaySets.size - 1
                 val homeNum = parseGames(homeStr)
                 val awayNum = parseGames(awayStr)
                 val homeWins = !isCurrentSet && homeNum != null && awayNum != null && homeNum > awayNum
@@ -107,8 +123,8 @@ fun SetScoreGrid(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            sets.forEachIndexed { i, (homeStr, awayStr) ->
-                val isCurrentSet = isLive && i == sets.size - 1
+            displaySets.forEachIndexed { i, (homeStr, awayStr) ->
+                val isCurrentSet = isLive && i == displaySets.size - 1
                 val homeNum = parseGames(homeStr)
                 val awayNum = parseGames(awayStr)
                 val awayWins = !isCurrentSet && homeNum != null && awayNum != null && awayNum > homeNum
