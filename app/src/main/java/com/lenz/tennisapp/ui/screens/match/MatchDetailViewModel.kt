@@ -113,6 +113,10 @@ class MatchDetailViewModel @Inject constructor(
                         detail = current.detail.copy(match = merged),
                         userPrediction = predMap[matchId]
                     )
+                    // Match just finished with a pending pick → resolve it.
+                    if (merged.status == MatchStatus.FINISHED && predMap[matchId]?.isPending == true) {
+                        predictionRepository.resolvePending()
+                    }
                 }
                 return
             }

@@ -15,6 +15,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SportsTennis
 import androidx.compose.material3.*
@@ -34,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -86,6 +91,8 @@ fun MatchDetailScreen(
                     ) {
                         MatchDetailContent(
                             detail = s.detail,
+                            userPrediction = s.userPrediction,
+                            onPredict = viewModel::predict,
                             listState = listState,
                             onBack = onBack,
                             onRefresh = viewModel::refresh,
@@ -179,6 +186,8 @@ private fun StickyMatchBanner(
 @Composable
 private fun MatchDetailContent(
     detail: MatchDetail,
+    userPrediction: UserPrediction?,
+    onPredict: (winnerKey: String, winnerName: String) -> Unit,
     listState: LazyListState,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
@@ -199,6 +208,16 @@ private fun MatchDetailContent(
                 onBack = onBack,
                 onRefresh = onRefresh,
                 onPlayerClick = onPlayerClick
+            )
+        }
+
+        // ── Prediction banner (pick the winner before start) ─────────────────
+        item {
+            PredictionBanner(
+                match = match,
+                userPrediction = userPrediction,
+                onPredict = onPredict,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
             )
         }
 
@@ -576,6 +595,140 @@ private fun isSetComplete(s1: Int, s2: Int): Boolean {
     return false
 }
 
+
+// ─── Prediction Banner (user pick) ───────────────────────────────────────────
+
+@Composable
+private fun PredictionBanner(
+    match: TennisMatch,
+    userPrediction: UserPrediction?,
+    onPredict: (winnerKey: String, winnerName: String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val canPredict = match.status == MatchStatus.NOT_STARTED || match.status == MatchStatus.TBD
+    val resolved = userPrediction?.isCorrect != null
+    val pickedKey = userPrediction?.predictedWinnerKey
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = AuraDeep
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Wer wird gewinnen?",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        when {
+                            resolved && userPrediction?.isCorrect == true -> "Richtig getippt ✓"
+                            resolved -> "Daneben getippt"
+                            !canPredict && pickedKey != null -> "Tipp gesperrt — Match läuft"
+                            !canPredict -> "Tipp nicht mehr möglich"
+                            pickedKey != null -> "Dein Tipp ist gespeichert"
+                            else -> "Tippe vor Spielbeginn"
+                        },
+                        color = Color.White.copy(alpha = 0.55f),
+                        fontSize = 12.sp
+                    )
+                }
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = AuraPurple,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                PredictionOption(
+                    player = match.homePlayer,
+                    selected = pickedKey == match.homePlayer.key,
+                    enabled = canPredict,
+                    outcome = if (resolved && pickedKey == match.homePlayer.key) userPrediction?.isCorrect else null,
+                    onClick = { onPredict(match.homePlayer.key, match.homePlayer.name) },
+                    modifier = Modifier.weight(1f)
+                )
+                PredictionOption(
+                    player = match.awayPlayer,
+                    selected = pickedKey == match.awayPlayer.key,
+                    enabled = canPredict,
+                    outcome = if (resolved && pickedKey == match.awayPlayer.key) userPrediction?.isCorrect else null,
+                    onClick = { onPredict(match.awayPlayer.key, match.awayPlayer.name) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PredictionOption(
+    player: Player,
+    selected: Boolean,
+    enabled: Boolean,
+    outcome: Boolean?,   // null = not resolved, true/false = correct/incorrect
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val accent = when (outcome) {
+        true -> AuraLime
+        false -> Color(0xFFEF4444)
+        null -> AuraPurple
+    }
+    val bg = if (selected) accent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f)
+    val border = if (selected) accent else Color.White.copy(alpha = 0.12f)
+
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(40.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        shape = RoundedCornerShape(40.dp),
+        color = bg,
+        border = BorderStroke(1.dp, border)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f))) {
+                if (!player.logoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = player.logoUrl,
+                        contentDescription = player.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(player.name.take(1), color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                    }
+                }
+            }
+            Text(
+                player.name.split(" ").last(),
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            when {
+                outcome == true -> Icon(Icons.Default.Check, null, tint = AuraLime, modifier = Modifier.size(18.dp))
+                outcome == false -> Icon(Icons.Default.Close, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                !enabled && !selected -> Icon(Icons.Default.Lock, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+            }
+        }
+    }
+}
 
 // ─── AI Prediction ───────────────────────────────────────────────────────────
 

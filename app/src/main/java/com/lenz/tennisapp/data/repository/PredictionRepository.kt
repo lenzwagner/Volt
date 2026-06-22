@@ -1,11 +1,14 @@
 package com.lenz.tennisapp.data.repository
 
+import com.lenz.tennisapp.data.db.dao.MatchDao
 import com.lenz.tennisapp.data.db.dao.PredictionDao
 import com.lenz.tennisapp.data.db.entities.UserPredictionEntity
 import com.lenz.tennisapp.domain.model.PredictionStats
 import com.lenz.tennisapp.domain.model.UserPrediction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import timber.log.Timber
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -13,7 +16,8 @@ import javax.inject.Singleton
 
 @Singleton
 class PredictionRepository @Inject constructor(
-    private val dao: PredictionDao
+    private val dao: PredictionDao,
+    private val matchDao: MatchDao
 ) {
     private val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
@@ -75,6 +79,25 @@ class PredictionRepository @Inject constructor(
 
     suspend fun deleteAllPredictions() {
         dao.deleteAllPredictions()
+    }
+
+    /**
+     * Resolve any pending pick whose match has finished: mark it correct/incorrect
+     * by comparing the picked winner to the match's actual winnerId.
+     */
+    suspend fun resolvePending() {
+        val finishedStatuses = setOf("finished", "retired", "walkover")
+        val pending = dao.getAllPredictions().first().filter { it.isCorrect == null }
+        for (p in pending) {
+            val match = matchDao.getMatchById(p.matchId) ?: continue
+            val isFinished = match.status.lowercase() in finishedStatuses
+            val winnerKey = match.winnerId
+            if (!isFinished || winnerKey.isNullOrBlank()) continue
+            val correct = winnerKey == p.predictedWinnerKey
+            val actualName = if (winnerKey == p.homePlayerKey) p.homePlayerName else p.awayPlayerName
+            dao.resolveResult(p.matchId, correct, winnerKey, actualName)
+            Timber.d("Resolved prediction ${p.matchId}: correct=$correct")
+        }
     }
 
     private fun UserPredictionEntity.toDomain() = UserPrediction(

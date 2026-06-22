@@ -33,6 +33,11 @@ class PredictionsViewModel @Inject constructor(
 
     private val _timeRange = MutableStateFlow(PredictionTimeRange.ALL)
 
+    init {
+        // Resolve any pending picks whose matches have finished.
+        viewModelScope.launch { repository.resolvePending() }
+    }
+
     val uiState: StateFlow<PredictionsUiState> = combine(
         repository.getAllPredictions(),
         repository.getStats(),
