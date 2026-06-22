@@ -54,8 +54,8 @@ fun AiRecommendationsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var allExpanded by remember { mutableStateOf(false) }
 
-    val topPicks = remember(state.matches, state.sortMode) {
-        state.matches.filter { it.isTopPick() }.sortedByDescending { it.sortScore(state.sortMode) }
+    val topPicks = remember(state.matches) {
+        state.matches.filter { it.isTopPick() }.sortedByDescending { it.sortScore(AiSortMode.WEIGHTED) }
     }
     val allSorted = remember(state.matches, state.sortMode) {
         state.matches.sortedByDescending { it.sortScore(state.sortMode) }
@@ -91,34 +91,6 @@ fun AiRecommendationsScreen(
                         }
                         Text(displayDate, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
-            }
-
-            // ── Sort toggle ──────────────────────────────────────────────
-            if (state.matches.isNotEmpty()) {
-                item {
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-                    ) {
-                        AiSortMode.entries.forEachIndexed { idx, mode ->
-                            SegmentedButton(
-                                selected = state.sortMode == mode,
-                                onClick = { viewModel.setSortMode(mode) },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = AiSortMode.entries.size),
-                                colors = SegmentedButtonDefaults.colors(
-                                    activeContainerColor = AuraPurple,
-                                    activeContentColor = Color.White,
-                                    inactiveContainerColor = Color.Transparent,
-                                    inactiveContentColor = AuraDeep.copy(alpha = 0.5f),
-                                    activeBorderColor = AuraPurple,
-                                    inactiveBorderColor = AuraDeep.copy(alpha = 0.1f)
-                                )
-                            ) {
-                                Text(mode.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
                 }
             }
 
@@ -172,6 +144,31 @@ fun AiRecommendationsScreen(
                 }
 
                 item { Spacer(Modifier.height(8.dp)) }
+            }
+
+            // ── Sort toggle (for Alle Prognosen) ────────────────────────
+            item {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    AiSortMode.entries.forEachIndexed { idx, mode ->
+                        SegmentedButton(
+                            selected = state.sortMode == mode,
+                            onClick = { viewModel.setSortMode(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = AiSortMode.entries.size),
+                            colors = SegmentedButtonDefaults.colors(
+                                activeContainerColor = AuraPurple,
+                                activeContentColor = Color.White,
+                                inactiveContainerColor = Color.Transparent,
+                                inactiveContentColor = AuraDeep.copy(alpha = 0.5f),
+                                activeBorderColor = AuraPurple,
+                                inactiveBorderColor = AuraDeep.copy(alpha = 0.1f)
+                            )
+                        ) {
+                            Text(mode.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
 
             // ── All Picks expandable ─────────────────────────────────────
