@@ -9,23 +9,24 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lenz.tennisapp.TennisApplication
-import com.lenz.tennisapp.ui.theme.CourtType
-import com.lenz.tennisapp.ui.theme.AuraPurple
-import com.lenz.tennisapp.ui.theme.AuraLime
-import com.lenz.tennisapp.ui.theme.AuraDeep
+import com.lenz.tennisapp.ui.theme.*
 
 /**
  * Ultra-expressive "Aura" Header.
@@ -41,10 +42,16 @@ fun GreenHeader(
     onCourtClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("TennisAppSettings", android.content.Context.MODE_PRIVATE) }
+    val blurVal = remember { prefs.getFloat("blur_radius", 0f) }
+    val overlayAlpha = remember { prefs.getFloat("gradient_intensity", 0.2f) }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .height(220.dp)
+            .clipToBounds()
             .then(if (onCourtClick != null) Modifier.clickable { onCourtClick() } else Modifier),
         color = AuraPurple
     ) {
@@ -60,7 +67,7 @@ fun GreenHeader(
                     .clip(CircleShape)
                     .background(
                         Brush.radialGradient(
-                            listOf(AuraLime.copy(alpha = 0.3f), Color.Transparent)
+                            listOf(AuraBlue.copy(alpha = 0.3f), Color.Transparent)
                         )
                     )
             )
@@ -82,10 +89,10 @@ fun GreenHeader(
                     model = court.imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().blur(blurVal.dp)
                 )
                 // Frosted glass / Color overlay
-                Box(modifier = Modifier.fillMaxSize().background(AuraPurple.copy(alpha = 0.2f)))
+                Box(modifier = Modifier.fillMaxSize().background(AuraPurple.copy(alpha = overlayAlpha)))
             }
 
             // 3. Floating Action Bar

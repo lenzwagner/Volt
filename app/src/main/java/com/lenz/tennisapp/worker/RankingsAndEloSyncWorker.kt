@@ -4,25 +4,19 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.lenz.tennisapp.data.repository.TennisRepository
-import com.lenz.tennisapp.data.scraper.LiveTennisScraper
-import com.lenz.tennisapp.data.scraper.PlayerMatcher
-import com.lenz.tennisapp.data.scraper.TennisAbstractScraper
+import com.lenz.tennisapp.data.repository.PlayerRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import timber.log.Timber
 
 /**
- * Worker that syncs rankings (live-tennis.eu) and Elo ratings (tennisabstract.com) daily at 3:00 AM.
+ * Worker that synchronizes ATP/WTA Rankings and Elo Scores.
  */
 @HiltWorker
 class RankingsAndEloSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val repository: TennisRepository,
-    private val tennisAbstractScraper: TennisAbstractScraper,
-    private val liveTennisScraper: LiveTennisScraper,
-    private val playerMatcher: PlayerMatcher
+    private val playerRepository: PlayerRepository
 ) : CoroutineWorker(appContext, workerParams) {
 
     companion object {
@@ -31,26 +25,17 @@ class RankingsAndEloSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            Timber.d("Starting Rankings + Elo sync...")
-            repository.clearOldRankingsAndElo()
+            Timber.d("RankingsAndEloSyncWorker: starting sync")
 
-            val eloOk = tennisAbstractScraper.scrapeAndSave()
-            val rankingsOk = liveTennisScraper.scrapeAndSave()
+            playerRepository.syncLiveRankings()
+            playerRepository.syncEloRatings()
+            playerRepository.syncPrizeMoney()
 
-            // Match players across all three sources
-            Timber.d("Matching players across data sources...")
-            playerMatcher.matchAll()
-
-            if (eloOk || rankingsOk) {
-                Timber.d("✅ Rankings + Elo sync completed (elo=$eloOk, rankings=$rankingsOk)")
-                Result.success()
-            } else {
-                Timber.w("⚠️ No data synced")
-                if (runAttemptCount < 3) Result.retry() else Result.failure()
-            }
+            Timber.d("RankingsAndEloSyncWorker: sync completed")
+            Result.success()
         } catch (e: Exception) {
-            Timber.e(e, "❌ Rankings + Elo sync failed")
-            if (runAttemptCount < 3) Result.retry() else Result.failure()
+            Timber.e(e, "RankingsAndEloSyncWorker: sync failed")
+            Result.retry()
         }
     }
 }

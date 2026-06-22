@@ -15,6 +15,7 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 sealed class MatchDetailUiState {
+    object Loading : MatchDetailUiState()
     data class Loaded(val detail: MatchDetail, val userPrediction: UserPrediction? = null) : MatchDetailUiState()
     data class Error(val message: String) : MatchDetailUiState()
 }
@@ -29,7 +30,9 @@ class MatchDetailViewModel @Inject constructor(
     private val matchId: String = checkNotNull(savedStateHandle["matchId"])
 
     private val _uiState = MutableStateFlow<MatchDetailUiState>(
-        MatchDetailUiState.Error("Lade...")  // Start with error state, will load immediately
+        repository.getCachedMatchDetail(matchId)
+            ?.let { MatchDetailUiState.Loaded(it) }
+            ?: MatchDetailUiState.Loading
     )
     val uiState: StateFlow<MatchDetailUiState> = _uiState.asStateFlow()
 
@@ -53,7 +56,14 @@ class MatchDetailViewModel @Inject constructor(
 
     fun loadDetail() {
         viewModelScope.launch {
-            fetchDetail(isSilent = false)
+            fetchDetail(isSilent = false, forceRefreshOdds = false)
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            Timber.d("Manual refresh triggered for match $matchId")
+            fetchDetail(isSilent = false, forceRefreshOdds = true)
         }
     }
 
@@ -77,14 +87,14 @@ class MatchDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchDetail(isSilent: Boolean) {
+    private suspend fun fetchDetail(isSilent: Boolean, forceRefreshOdds: Boolean = false) {
         try {
             if (!isSilent) _isRefreshing.value = true
-            Timber.d("Loading match detail for ID: $matchId (silent=$isSilent)")
+            Timber.d("Loading match detail for ID: $matchId (silent=$isSilent, forceOdds=$forceRefreshOdds)")
             val predMap = predictionRepository.getPredictionMap().first()
 
             // Show loaded state immediately with basic match info
-            val result = repository.getMatchDetail(matchId)
+            val result = repository.getMatchDetail(matchId, forceRefreshOdds)
 
             _uiState.value = when (result) {
                 is Result.Success -> {
@@ -94,10 +104,14 @@ class MatchDetailViewModel @Inject constructor(
                     )
                 }
                 is Result.Error -> {
-                    if (isSilent) _uiState.value else MatchDetailUiState.Error(result.message)
+                    val current = _uiState.value
+                    if (isSilent || current is MatchDetailUiState.Loaded) current
+                    else MatchDetailUiState.Error(result.message)
                 }
                 else -> {
-                    if (isSilent) _uiState.value else MatchDetailUiState.Error("Unbekannter Fehler")
+                    val current = _uiState.value
+                    if (isSilent || current is MatchDetailUiState.Loaded) current
+                    else MatchDetailUiState.Error("Unbekannter Fehler")
                 }
             }
         } catch (e: Exception) {

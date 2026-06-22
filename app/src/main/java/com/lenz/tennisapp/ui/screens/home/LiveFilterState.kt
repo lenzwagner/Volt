@@ -21,7 +21,15 @@ enum class FilterCategory(
     MASTERS   ("Masters",    setOf(TournamentCategory.ATP_MASTERS_1000, TournamentCategory.WTA_1000)),
     FIVE00    ("500er",      setOf(TournamentCategory.ATP_500,          TournamentCategory.WTA_500)),
     TWO50     ("250er",      setOf(TournamentCategory.ATP_250,          TournamentCategory.WTA_250)),
-    CHALLENGER("Challenger", setOf(TournamentCategory.CHALLENGER)),
+    WTA125    ("WTA 125",    setOf(TournamentCategory.WTA_125)),
+    CHALLENGER("Challenger", setOf(
+        TournamentCategory.CHALLENGER,
+        TournamentCategory.CHALLENGER_175,
+        TournamentCategory.CHALLENGER_125,
+        TournamentCategory.CHALLENGER_100,
+        TournamentCategory.CHALLENGER_75,
+        TournamentCategory.CHALLENGER_50
+    )),
     ITF       ("ITF",        setOf(TournamentCategory.ITF));
 }
 
@@ -60,14 +68,20 @@ data class LiveFilterState(
             val isWta = id.contains("wta") || name.contains("wta") || 
                         tournament.category == TournamentCategory.WTA_1000 ||
                         tournament.category == TournamentCategory.WTA_500 ||
-                        tournament.category == TournamentCategory.WTA_250
+                        tournament.category == TournamentCategory.WTA_250 ||
+                        tournament.category == TournamentCategory.WTA_125
             
             val isAtp = id.contains("atp") || name.contains("atp") || 
                         id.contains("challenger_men") ||
                         tournament.category == TournamentCategory.ATP_MASTERS_1000 ||
                         tournament.category == TournamentCategory.ATP_500 ||
                         tournament.category == TournamentCategory.ATP_250 ||
-                        (tournament.category == TournamentCategory.CHALLENGER && !isWta)
+                        ((tournament.category == TournamentCategory.CHALLENGER ||
+                          tournament.category == TournamentCategory.CHALLENGER_175 ||
+                          tournament.category == TournamentCategory.CHALLENGER_125 ||
+                          tournament.category == TournamentCategory.CHALLENGER_100 ||
+                          tournament.category == TournamentCategory.CHALLENGER_75 ||
+                          tournament.category == TournamentCategory.CHALLENGER_50) && !isWta)
             
             // For Grand Slams/ITF where both tours might be mixed, check match IDs
             val matchesWta = if (!isWta && !isAtp) tournament.matches.any { it.leagueId.contains("wta", true) } else isWta

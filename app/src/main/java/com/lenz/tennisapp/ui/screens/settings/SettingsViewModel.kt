@@ -85,8 +85,8 @@ class SettingsViewModel @Inject constructor(
             try {
                 // Simple request to verify key
                 val date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                val resp = tennisApi.getFixtures(apiKey = key.trim(), dateStart = date, dateStop = date)
-                if (resp.success == 1) {
+                val resp = tennisApi.getFixtures(eventType = 1, dateStart = date, dateStop = date, apiKey = key.trim())
+                if (resp.success == "1") {
                     _tennisTestResult.value = "Erfolg: Key ist gültig!"
                     keyStore.setTennisKeyExpired(false)
                 } else {

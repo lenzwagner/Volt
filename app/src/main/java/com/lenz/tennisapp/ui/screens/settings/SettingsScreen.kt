@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -82,6 +83,8 @@ fun SettingsScreen(
                 item { SectionLabel("Daten") }
 
                 item { RankingsSyncCard() }
+
+                item { OddsSyncCard() }
 
                 item { SectionLabel("Upcoming Features") }
 
@@ -195,7 +198,9 @@ private fun ApiKeySection(
 ) {
     var editedKey by remember(currentKey) { mutableStateOf(currentKey) }
     var showKey by remember { mutableStateOf(false) }
+    var showSavedMessage by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -221,6 +226,16 @@ private fun ApiKeySection(
             shape = RoundedCornerShape(12.dp)
         )
 
+        if (showSavedMessage) {
+            Text(
+                "✅ Gespeichert! Bitte starte die App neu, um die Änderungen zu übernehmen.",
+                style = MaterialTheme.typography.labelSmall,
+                color = AuraPurple,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+
         testResult?.let {
             val isError = it.startsWith("Fehler")
             Text(
@@ -234,7 +249,11 @@ private fun ApiKeySection(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { onSave(editedKey) },
+                onClick = { 
+                    onSave(editedKey)
+                    showSavedMessage = true
+                    android.widget.Toast.makeText(context, "Key gespeichert", android.widget.Toast.LENGTH_SHORT).show()
+                },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp)
             ) {
@@ -242,7 +261,10 @@ private fun ApiKeySection(
             }
             
             Button(
-                onClick = { onTest(editedKey) },
+                onClick = { 
+                    showSavedMessage = false
+                    onTest(editedKey) 
+                },
                 modifier = Modifier.weight(1f),
                 enabled = !isTesting,
                 shape = RoundedCornerShape(10.dp),
@@ -476,7 +498,26 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun RankingsSyncCard() {
     val context = LocalContext.current
-    var isSyncing by remember { mutableStateOf(false) }
+    val workManager = remember { WorkManager.getInstance(context) }
+    val workInfos by workManager
+        .getWorkInfosForUniqueWorkLiveData("${RankingsAndEloSyncWorker.WORK_NAME}_manual")
+        .observeAsState()
+
+    val syncState = workInfos?.firstOrNull()?.state
+    val isSyncing = syncState == androidx.work.WorkInfo.State.ENQUEUED ||
+            syncState == androidx.work.WorkInfo.State.RUNNING
+
+    var showSuccess by remember { mutableStateOf(false) }
+
+    // Show success for 3 seconds after completion
+    LaunchedEffect(syncState) {
+        if (syncState == androidx.work.WorkInfo.State.SUCCEEDED) {
+            showSuccess = true
+            kotlinx.coroutines.delay(3000L)
+            showSuccess = false
+        }
+    }
+
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Rankings und Elo-Scores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -485,24 +526,89 @@ private fun RankingsSyncCard() {
             
             Button(
                 onClick = {
-                    isSyncing = true
-                    WorkManager.getInstance(context).enqueueUniqueWork(
+                    workManager.enqueueUniqueWork(
                         "${RankingsAndEloSyncWorker.WORK_NAME}_manual", 
                         androidx.work.ExistingWorkPolicy.REPLACE, 
                         androidx.work.OneTimeWorkRequestBuilder<RankingsAndEloSyncWorker>().build()
                     )
-                    Handler(Looper.getMainLooper()).postDelayed({ isSyncing = false }, 2000)
                 }, 
                 enabled = !isSyncing, 
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AuraDeep)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
+                )
             ) {
                 if (isSyncing) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
                     Spacer(Modifier.width(8.dp))
+                    Text("Synchronisiere...")
+                } else if (showSuccess) {
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Erfolgreich!")
+                } else {
+                    Text("Jetzt synchronisieren")
                 }
-                Text("Jetzt synchronisieren")
+            }
+        }
+    }
+}
+
+@Composable
+private fun OddsSyncCard() {
+    val context = LocalContext.current
+    val workManager = remember { WorkManager.getInstance(context) }
+    val workInfos by workManager
+        .getWorkInfosForUniqueWorkLiveData("${com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME}_manual")
+        .observeAsState()
+
+    val syncState = workInfos?.firstOrNull()?.state
+    val isSyncing = syncState == androidx.work.WorkInfo.State.ENQUEUED ||
+            syncState == androidx.work.WorkInfo.State.RUNNING
+
+    var showSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(syncState) {
+        if (syncState == androidx.work.WorkInfo.State.SUCCEEDED) {
+            showSuccess = true
+            kotlinx.coroutines.delay(3000L)
+            showSuccess = false
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Tipico Wettquoten", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Täglicher automatischer Sync der Wettquoten (um 7:00 Uhr). Hier manuell für alle offenen Spiele aktualisieren.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            Button(
+                onClick = {
+                    workManager.enqueueUniqueWork(
+                        "${com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME}_manual",
+                        androidx.work.ExistingWorkPolicy.REPLACE,
+                        androidx.work.OneTimeWorkRequestBuilder<com.lenz.tennisapp.worker.OddsSyncWorker>().build()
+                    )
+                },
+                enabled = !isSyncing,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
+                )
+            ) {
+                if (isSyncing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Synchronisiere...")
+                } else if (showSuccess) {
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Erfolgreich!")
+                } else {
+                    Text("Jetzt synchronisieren")
+                }
             }
         }
     }

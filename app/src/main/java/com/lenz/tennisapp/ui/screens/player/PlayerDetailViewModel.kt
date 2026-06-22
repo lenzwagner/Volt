@@ -7,6 +7,7 @@ import com.lenz.tennisapp.data.db.dao.EloDao
 import com.lenz.tennisapp.data.db.dao.FollowedPlayerDao
 import com.lenz.tennisapp.data.db.entities.FollowedPlayerEntity
 import com.lenz.tennisapp.data.repository.TennisRepository
+import com.lenz.tennisapp.data.scraper.LiveTennisScraper
 import com.lenz.tennisapp.domain.model.MatchStatus
 import com.lenz.tennisapp.domain.model.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -176,13 +177,12 @@ class PlayerDetailViewModel @Inject constructor(
 
             val eloRating = eloDao.getEloByPlayerKey(playerKey) ?: eloDao.getEloByLastName(lastName)
             eloRating?.let { elo ->
-                val overall = elo.eloOverall ?: 1500.0
-                _eloScores.value = buildMap {
-                    put("overall", overall.toInt())
-                    elo.eloHard?.let  { put("hard",  it.toInt()) }
-                    elo.eloClay?.let  { put("clay",  it.toInt()) }
-                    elo.eloGrass?.let { put("grass", it.toInt()) }
-                }
+                _eloScores.value = mapOf(
+                    "overall" to elo.eloOverall.toInt(),
+                    "hard" to elo.eloHard.toInt(),
+                    "clay" to elo.eloClay.toInt(),
+                    "grass" to elo.eloGrass.toInt()
+                )
             }
         } catch (e: Exception) {
             Timber.e(e, "Error loading from DB")
@@ -198,13 +198,23 @@ class PlayerDetailViewModel @Inject constructor(
             val isTour = if (playerKey.contains("wta", ignoreCase = true)) "WTA" else "ATP"
             val lastName = playerName.split(" ").lastOrNull() ?: playerName
             
-            // Look up ranking from DB (populated by RankingsAndEloSyncWorker via live-tennis.eu)
-            var rankingInfo = rankingDao.getRankingByPlayerNameAndTour("%$playerName%", isTour)
+            var rankingInfo = if (isTour == "ATP") LiveTennisScraper.getATPRanking(playerName) else LiveTennisScraper.getWTARanking(playerName)
             if (rankingInfo == null && lastName != playerName) {
-                rankingInfo = rankingDao.getRankingByPlayerNameAndTour("%$lastName%", isTour)
+                rankingInfo = if (isTour == "ATP") LiveTennisScraper.getATPRanking(lastName) else LiveTennisScraper.getWTARanking(lastName)
             }
 
-            val prizeMoneyFormatted: String? = null
+            var prizeMoney = if (isTour == "ATP") LiveTennisScraper.getATPPrizeMoney(playerName) else LiveTennisScraper.getWTAPrizeMoney(playerName)
+            if (prizeMoney == null && lastName != playerName) {
+                prizeMoney = if (isTour == "ATP") LiveTennisScraper.getATPPrizeMoney(lastName) else LiveTennisScraper.getWTAPrizeMoney(lastName)
+            }
+
+            val prizeMoneyFormatted = prizeMoney?.let { money ->
+                when {
+                    money.prizeMoneyCurrentYear >= 1_000_000 -> "€${String.format("%.1f", money.prizeMoneyCurrentYear / 1_000_000.0)}M"
+                    money.prizeMoneyCurrentYear >= 1_000 -> "€${String.format("%.0f", money.prizeMoneyCurrentYear / 1_000.0)}K"
+                    else -> "€${money.prizeMoneyCurrentYear}"
+                }
+            }
 
             var playerImageUrl: String? = repository.getPlayerLogo(playerKey)
             val recentMatches = mutableListOf<RecentMatch>()

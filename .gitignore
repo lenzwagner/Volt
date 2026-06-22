@@ -9,9 +9,26 @@
 .gradle/
 app/build/
 build/
+/captures
+.externalNativeBuild
+.cxx
+*.iml
 
 # IDE
 .idea/
 
 # Local config
 local.properties
+
+# Signing — NEVER commit
+release.keystore
+release.keystore.base64.txt
+keystore.properties
+*.jks
+
+# Proxy node_modules (submodule has own ignore)
+tennis-ranking-proxy/node_modules/
+
+# Android Studio recovery/build junk
+app/recovery/
+*.hprof

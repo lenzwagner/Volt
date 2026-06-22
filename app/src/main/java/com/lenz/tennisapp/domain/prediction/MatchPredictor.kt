@@ -32,7 +32,13 @@ class MatchPredictor @Inject constructor(
             TournamentCategory.ATP_MASTERS_1000, TournamentCategory.WTA_1000 -> 40.0
             TournamentCategory.ATP_500, TournamentCategory.WTA_500 -> 32.0
             TournamentCategory.ATP_250, TournamentCategory.WTA_250 -> 24.0
-            TournamentCategory.CHALLENGER -> 20.0
+            TournamentCategory.WTA_125 -> 20.0
+            TournamentCategory.CHALLENGER,
+            TournamentCategory.CHALLENGER_175,
+            TournamentCategory.CHALLENGER_125,
+            TournamentCategory.CHALLENGER_100,
+            TournamentCategory.CHALLENGER_75,
+            TournamentCategory.CHALLENGER_50 -> 20.0
             else -> 16.0
         }
     }
@@ -54,7 +60,7 @@ class MatchPredictor @Inject constructor(
         val surfaceElo2 = surfaceElo(elo2, match.surface)
 
         // Weighted combination: 40% surface ELO, 40% overall ELO, 20% rank
-        val eloProb = eloWinProbability(elo1.eloOverall ?: 1500.0, elo2.eloOverall ?: 1500.0)
+        val eloProb = eloWinProbability(elo1.eloOverall, elo2.eloOverall)
         val surfaceProb = eloWinProbability(surfaceElo1, surfaceElo2)
 
         val rankProb = rankProbability(match.homePlayer.ranking, match.awayPlayer.ranking)
@@ -107,15 +113,12 @@ class MatchPredictor @Inject constructor(
         )
     }
 
-    private fun surfaceElo(elo: EloRatingEntity, surface: Surface): Double {
-        val overall = elo.eloOverall ?: 1500.0
-        return when (surface) {
-            Surface.CLAY -> elo.eloClay ?: overall
-            Surface.GRASS -> elo.eloGrass ?: overall
-            Surface.HARD -> elo.eloHard ?: overall
-            Surface.INDOOR_HARD -> elo.eloIndoor ?: elo.eloHard ?: overall
-            else -> overall
-        }
+    private fun surfaceElo(elo: EloRatingEntity, surface: Surface): Double = when (surface) {
+        Surface.CLAY -> elo.eloClay
+        Surface.GRASS -> elo.eloGrass
+        Surface.HARD -> elo.eloHard
+        Surface.INDOOR_HARD -> elo.eloIndoor
+        else -> elo.eloOverall
     }
 
     private fun rankProbability(rank1: Int?, rank2: Int?): Float {
@@ -143,13 +146,11 @@ class MatchPredictor @Inject constructor(
     ): List<PredictionFactor> {
         val factors = mutableListOf<PredictionFactor>()
 
-        val overall1 = elo1.eloOverall ?: 1500.0
-        val overall2 = elo2.eloOverall ?: 1500.0
-        val eloGap = abs(overall1 - overall2)
+        val eloGap = abs(elo1.eloOverall - elo2.eloOverall)
         if (eloGap > 20) {
             factors.add(PredictionFactor(
                 label = "ELO Rating",
-                favoredPlayer = if (overall1 > overall2) 1 else 2,
+                favoredPlayer = if (elo1.eloOverall > elo2.eloOverall) 1 else 2,
                 strength = (eloGap / 400.0).coerceIn(0.0, 1.0).toFloat()
             ))
         }
@@ -197,7 +198,7 @@ class MatchPredictor @Inject constructor(
         val loserElo = eloDao.getElo(loserKey) ?: EloRatingEntity(loserKey, loserName)
         val k = kFactor(category)
 
-        val (newWinnerOverall, newLoserOverall) = updateElo(winnerElo.eloOverall ?: 1500.0, loserElo.eloOverall ?: 1500.0, k)
+        val (newWinnerOverall, newLoserOverall) = updateElo(winnerElo.eloOverall, loserElo.eloOverall, k)
         val winnerSurface = surfaceElo(winnerElo, surface)
         val loserSurface = surfaceElo(loserElo, surface)
         val (newWinnerSurface, newLoserSurface) = updateElo(winnerSurface, loserSurface, k)
@@ -207,6 +208,7 @@ class MatchPredictor @Inject constructor(
             Surface.GRASS -> elo.copy(eloGrass = newVal)
             Surface.HARD -> elo.copy(eloHard = newVal)
             Surface.INDOOR_HARD -> elo.copy(eloIndoor = newVal)
+            Surface.CLAY -> elo.copy(eloClay = newVal)
             else -> elo
         }
 

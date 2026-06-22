@@ -2,45 +2,41 @@ package com.lenz.tennisapp.ui.screens.home
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.lenz.tennisapp.domain.model.MatchStatus
-import com.lenz.tennisapp.domain.model.Surface as CourtSurface
-import com.lenz.tennisapp.domain.model.Tournament
-import com.lenz.tennisapp.domain.model.TournamentCategory
-import com.lenz.tennisapp.domain.model.UserPrediction
-import com.lenz.tennisapp.ui.components.GreenHeader
-import com.lenz.tennisapp.ui.components.MatchCard
+import coil3.compose.AsyncImage
+import com.lenz.tennisapp.domain.model.*
 import com.lenz.tennisapp.ui.theme.*
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,567 +46,855 @@ fun HomeScreen(
     showHeader: Boolean = true,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val todayState   by viewModel.uiState.collectAsStateWithLifecycle()
-    val liveState    by viewModel.liveUiState.collectAsStateWithLifecycle()
-    val liveOnly     by viewModel.liveOnly.collectAsStateWithLifecycle()
-    val liveCount    by viewModel.liveMatchCount.collectAsStateWithLifecycle()
+    val state by viewModel.todayUiState.collectAsStateWithLifecycle()
+    val tourFilter by viewModel.tourFilter.collectAsStateWithLifecycle()
+    val formatFilter by viewModel.formatFilter.collectAsStateWithLifecycle()
+    val categoryFilter by viewModel.categoryFilter.collectAsStateWithLifecycle()
+    val liveFilter by viewModel.liveFilter.collectAsStateWithLifecycle()
+    val finishedFilter by viewModel.finishedFilter.collectAsStateWithLifecycle()
+    val liveCount by viewModel.liveCount.collectAsStateWithLifecycle()
 
-    val state = if (liveOnly) liveState else todayState
-    val filter = state.liveFilter
+    var showFilters by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
-    var showFilterSheet by remember { mutableStateOf(false) }
-
-    val filteredTournaments = remember(state.tournaments, filter) {
-        state.tournaments
-            .filter { filter.matches(it) }
-            .sortedWith(compareBy({ it.category.sortOrder }, { it.name }))
-    }
-
-    val activeFilterCount = remember(filter) {
-        filter.tours.size + filter.categories.size + filter.matchTypes.size
-    }
+    val activeFilterCount = listOf(
+        tourFilter != TourFilter.ALL,
+        formatFilter != FormatFilter.ALL,
+        categoryFilter != CategoryFilter.ALL
+    ).count { it }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F1A0F))
+            .background(Color.White)
     ) {
-        if (showHeader) {
-            GreenHeader(
-                title    = "Tennis Today",
-                subtitle = state.selectedDate.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN))
-            )
-        }
+        val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
+        val tournaments = state.tournaments ?: emptyList()
 
-        // ── Compact action bar ────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Filter button
-            FilterButton(
-                activeCount = activeFilterCount,
-                onClick = { showFilterSheet = true }
-            )
-
-            // Live toggle button
-            LiveButton(
-                liveCount = liveCount,
-                isActive  = liveOnly,
-                onClick   = viewModel::toggleLiveOnly
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Date navigation (only when not in live mode)
-            if (!liveOnly) {
-                DateNavigator(
-                    date       = state.selectedDate,
-                    onPrevious = { viewModel.selectDate(state.selectedDate.minusDays(1)) },
-                    onNext     = { viewModel.selectDate(state.selectedDate.plusDays(1)) },
-                    onToday    = { viewModel.selectDate(LocalDate.now()) }
-                )
+        CompactFilterRow(
+            liveFilterActive = liveFilter,
+            finishedFilterActive = finishedFilter,
+            liveCount = liveCount,
+            activeFilterCount = activeFilterCount,
+            onToggleLive = viewModel::toggleLiveFilter,
+            onToggleFinished = viewModel::toggleFinishedFilter,
+            onOpenFilters = { showFilters = true },
+            onCollapseAll = {
+                val allCollapsed = tournaments.all { expandedMap[it.id] == false }
+                val newState = allCollapsed
+                tournaments.forEach { expandedMap[it.id] = newState }
             }
-        }
+        )
 
-        // ── Content ───────────────────────────────────────────────────────────
-        if (state.isLoading && filteredTournaments.isEmpty()) {
+        if (state.isLoading && !state.isRefreshing) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = TennisGreenBright, modifier = Modifier.size(36.dp))
-            }
-        } else if (filteredTournaments.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(
-                    if (liveOnly) "Keine Live-Spiele" else "Keine Spiele gefunden",
-                    color = Color.White.copy(alpha = 0.3f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black
-                )
+                CircularProgressIndicator(color = AuraPurple)
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                items(filteredTournaments, key = { it.id }) { tournament ->
-                    TournamentCard(
-                        tournament   = tournament,
-                        predictions  = state.predictions,
-                        onMatchClick = onMatchClick,
-                        onPredict    = { matchId, matchDate, tName, hKey, hName, aKey, aName, wKey, wName ->
-                            viewModel.predict(matchId, matchDate, tName, hKey, hName, aKey, aName, wKey, wName)
-                        }
-                    )
+            if (tournaments.isEmpty() && !state.isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Keine Matches gefunden", color = Color.Gray)
                 }
-            }
-        }
-    }
-
-    // ── Filter bottom sheet ───────────────────────────────────────────────────
-    if (showFilterSheet) {
-        FilterBottomSheet(
-            filter           = filter,
-            onDismiss        = { showFilterSheet = false },
-            onTourToggle     = viewModel::toggleTourFilter,
-            onCategoryToggle = viewModel::toggleCategoryFilter,
-            onMatchTypeToggle= viewModel::toggleMatchTypeFilter,
-            onClear          = { viewModel.clearLiveFilters(); showFilterSheet = false }
-        )
-    }
-}
-
-// ─── Action bar buttons ───────────────────────────────────────────────────────
-
-@Composable
-private fun FilterButton(activeCount: Int, onClick: () -> Unit) {
-    Surface(
-        shape  = RoundedCornerShape(20.dp),
-        color  = if (activeCount > 0) TennisGreen else Color(0xFF1E2E1E),
-        modifier = Modifier
-            .height(36.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(Icons.Default.Tune, null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Text(
-                if (activeCount > 0) "$activeCount Filter" else "Filter",
-                color = Color.White,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-private fun LiveButton(liveCount: Int, isActive: Boolean, onClick: () -> Unit) {
-    val bgColor by animateColorAsState(
-        targetValue = if (isActive) Color.Red else Color(0xFF1E2E1E),
-        animationSpec = tween(200),
-        label = "live_bg"
-    )
-
-    Surface(
-        shape    = RoundedCornerShape(20.dp),
-        color    = bgColor,
-        modifier = Modifier
-            .height(36.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // Pulsing dot when active
-            if (isActive) {
-                val infiniteTransition = rememberInfiniteTransition(label = "live_pulse")
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 1f, targetValue = 0.3f,
-                    animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-                    label = "pulse_alpha"
-                )
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = alpha))
-                )
             } else {
-                Icon(
-                    Icons.Default.FiberManualRecord,
-                    null,
-                    tint = Color.Red,
-                    modifier = Modifier.size(10.dp)
-                )
-            }
-            Text("Live", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            if (liveCount > 0) {
-                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.25f)) {
-                    Text(
-                        liveCount.toString(),
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                    )
+                // Ensure new tournaments are expanded by default
+                LaunchedEffect(tournaments) {
+                    tournaments.forEach { 
+                        if (it.id !in expandedMap) {
+                            expandedMap[it.id] = true
+                        }
+                    }
+                }
+
+                PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = viewModel::refresh,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 120.dp)
+                    ) {
+                        tournaments.forEach { tournament ->
+                            item(key = "tour_${tournament.id}") {
+                                val expanded = expandedMap[tournament.id] ?: true
+                                TournamentBanner(
+                                    tournament = tournament,
+                                    expanded = expanded,
+                                    onClick = { expandedMap[tournament.id] = !expanded }
+                                )
+                            }
+
+                            if (expandedMap[tournament.id] != false) {
+                                items(tournament.matches, key = { "match_${it.id}" }) { match ->
+                                    MatchRow(
+                                        match = match,
+                                        onClick = { onMatchClick(match.id) },
+                                        modifier = Modifier
+                                            .animateItem(
+                                                fadeInSpec = tween(durationMillis = 250),
+                                                fadeOutSpec = tween(durationMillis = 200),
+                                                placementSpec = spring(
+                                                    stiffness = Spring.StiffnessLow,
+                                                    visibilityThreshold = IntOffset.VisibilityThreshold
+                                                )
+                                            )
+                                            .padding(vertical = 1.dp)
+                                    )
+                                }
+                                item { Spacer(Modifier.height(6.dp)) }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-}
 
-// ─── Filter bottom sheet ──────────────────────────────────────────────────────
+    if (showFilters) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        val window = (view.context as? android.app.Activity)?.window
+        DisposableEffect(Unit) {
+            window?.let { w ->
+                val controller = androidx.core.view.WindowCompat.getInsetsController(w, view)
+                w.navigationBarColor = android.graphics.Color.parseColor("#1D1B20")
+                controller.isAppearanceLightNavigationBars = false
+            }
+            onDispose {
+                window?.let { w ->
+                    val controller = androidx.core.view.WindowCompat.getInsetsController(w, view)
+                    w.navigationBarColor = android.graphics.Color.WHITE
+                    controller.isAppearanceLightNavigationBars = true
+                }
+            }
+        }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FilterBottomSheet(
-    filter: LiveFilterState,
-    onDismiss: () -> Unit,
-    onTourToggle: (TourType) -> Unit,
-    onCategoryToggle: (FilterCategory) -> Unit,
-    onMatchTypeToggle: (MatchType) -> Unit,
-    onClear: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest  = onDismiss,
-        sheetState        = sheetState,
-        containerColor    = Color.Transparent,
-        contentColor      = Color.White,
-        dragHandle        = null,
-        windowInsets      = WindowInsets(0)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.52f)
+        ModalBottomSheet(
+            onDismissRequest = { showFilters = false },
+            sheetState = sheetState,
+            containerColor = Color.Transparent,
+            dragHandle = null,
+            contentWindowInsets = { WindowInsets(0) }
         ) {
-            // Gradient background: transparent at top, dark green filling in
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.6f)
                     .background(
-                        Brush.verticalGradient(
-                            0f   to Color.Transparent,
-                            0.18f to Color(0xFF0D1F0D),
-                            1f   to Color(0xFF0A1A0A)
-                        )
+                        color = AuraDeep,
+                        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                     )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 32.dp, start = 20.dp, end = 20.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
             ) {
-                // Header row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 24.dp)
                 ) {
-                    Text(
-                        "Filter",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp, 4.dp)
+                            .background(Color.White.copy(alpha = 0.3f), CircleShape)
+                            .align(Alignment.CenterHorizontally)
                     )
-                    if (filter.isActive) {
-                        TextButton(onClick = onClear) {
-                            Text("Zurücksetzen", color = TennisGreenBright, fontSize = 13.sp)
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Filter",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = { showFilters = false }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Anwenden",
+                                tint = AuraLime,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
-                }
 
-                // Tour section
-                FilterSection(label = "Tour") {
-                    TourType.entries.filter { it != TourType.JUNIORS }.forEach { tour ->
-                        FilterPill(
-                            label    = tour.label,
-                            selected = tour in filter.tours,
-                            color    = TennisGreen,
-                            onClick  = { onTourToggle(tour) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp)
+                    ) {
+                        Spacer(Modifier.height(24.dp))
+                        
+                        FilterSection(
+                            title = "Tour",
+                            options = TourFilter.entries,
+                            selected = tourFilter,
+                            onSelect = viewModel::setTourFilter
                         )
-                    }
-                }
-
-                // Category section
-                FilterSection(label = "Kategorie") {
-                    FilterCategory.entries.forEach { cat ->
-                        FilterPill(
-                            label    = cat.label,
-                            selected = cat in filter.categories,
-                            color    = categoryColor(cat),
-                            onClick  = { onCategoryToggle(cat) }
+                        Spacer(Modifier.height(20.dp))
+                        FilterSection(
+                            title = "Format",
+                            options = FormatFilter.entries,
+                            selected = formatFilter,
+                            onSelect = viewModel::setFormatFilter
                         )
-                    }
-                }
-
-                // Match type section
-                FilterSection(label = "Spieltyp") {
-                    MatchType.entries.forEach { mt ->
-                        FilterPill(
-                            label    = mt.label,
-                            selected = mt in filter.matchTypes,
-                            color    = AuraPurple,
-                            onClick  = { onMatchTypeToggle(mt) }
+                        Spacer(Modifier.height(20.dp))
+                        FilterSection(
+                            title = "Kategorie",
+                            options = CategoryFilter.entries,
+                            selected = categoryFilter,
+                            onSelect = viewModel::setCategoryFilter
                         )
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-private fun FilterSection(label: String, content: @Composable RowScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            label.uppercase(),
-            color = Color.White.copy(alpha = 0.4f),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 1.5.sp
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { content() }
-    }
-}
-
-@Composable
-private fun FilterPill(label: String, selected: Boolean, color: Color, onClick: () -> Unit) {
-    val bg by animateColorAsState(
-        targetValue = if (selected) color else Color.White.copy(alpha = 0.07f),
-        animationSpec = tween(150), label = "pill_bg"
-    )
-    Surface(
-        shape    = RoundedCornerShape(20.dp),
-        color    = bg,
-        modifier = Modifier
-            .height(34.dp)
-            .border(
-                1.dp,
-                if (selected) Color.Transparent else Color.White.copy(alpha = 0.15f),
-                RoundedCornerShape(20.dp)
-            )
-            .clickable(onClick = onClick)
-    ) {
+    // Applying milky blur when filters are shown
+    if (showFilters) {
         Box(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        }
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(16.dp)
+                .background(Color.White.copy(alpha = 0.4f))
+        )
     }
 }
 
-// ─── Tournament card ──────────────────────────────────────────────────────────
-
 @Composable
-private fun TournamentCard(
-    tournament: Tournament,
-    predictions: Map<String, UserPrediction>,
-    onMatchClick: (String) -> Unit,
-    onPredict: (String, String, String, String, String, String, String, String, String) -> Unit
+fun CompactFilterRow(
+    liveFilterActive: Boolean,
+    finishedFilterActive: Boolean,
+    liveCount: Int,
+    activeFilterCount: Int,
+    onToggleLive: () -> Unit,
+    onToggleFinished: () -> Unit,
+    onOpenFilters: () -> Unit,
+    onCollapseAll: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(true) }
-
-    val liveCount = tournament.matches.count { it.status == MatchStatus.LIVE }
-
-    val sortedMatches = remember(tournament.matches) {
-        val (live, rest) = tournament.matches.partition { it.status == MatchStatus.LIVE }
-        val (upcoming, finished) = rest.partition {
-            it.status == MatchStatus.NOT_STARTED || it.status == MatchStatus.POSTPONED
-        }
-        live + upcoming.sortedBy { it.time } + finished.sortedByDescending { it.time }
-    }
-
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF1A2A1A),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, TennisGreen.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column {
-            // Header
+        // Filter Button
+        Surface(
+            onClick = onOpenFilters,
+            color = AuraDeep,
+            shape = CircleShape,
+            modifier = Modifier.height(40.dp)
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (activeFilterCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .background(Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            activeFilterCount.toString(),
+                            color = AuraDeep,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Icon(Icons.Outlined.FilterList, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+                Text("Filter", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        // Collapse All Button
+        Surface(
+            onClick = onCollapseAll,
+            color = Color(0xFFF5F5F5),
+            shape = CircleShape,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.UnfoldLess,
+                    contentDescription = "Alle einklappen",
+                    tint = Color.DarkGray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        // Live Toggle Button
+        Surface(
+            onClick = onToggleLive,
+            color = if (liveFilterActive) Color(0xFFFFEBEE) else Color(0xFFF5F5F5),
+            shape = CircleShape,
+            modifier = Modifier.height(40.dp),
+            border = if (liveFilterActive) BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)) else null
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .width(4.dp)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(TennisGreenBright)
+                        .size(8.dp)
+                        .background(Color.Red, CircleShape)
                 )
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        tournament.name.uppercase(),
-                        style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp),
-                        fontWeight = FontWeight.Black,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Text(
+                    "Live",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (liveFilterActive) FontWeight.Bold else FontWeight.Normal
+                )
+                if (liveCount > 0) {
+                    Surface(
+                        color = if (liveFilterActive) Color.Red else Color.Gray.copy(alpha = 0.2f),
+                        shape = CircleShape
                     ) {
                         Text(
-                            tournament.category.displayName,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = categoryColor(tournament.category),
+                            text = liveCount.toString(),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (liveFilterActive) Color.White else Color.DarkGray,
                             fontWeight = FontWeight.Bold
-                        )
-                        Text("·", color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
-                        Text(
-                            "${categoryPoints(tournament.category, tournament.name)} Pts",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                        Text("·", color = Color.White.copy(alpha = 0.3f), fontSize = 10.sp)
-                        SurfaceDot(tournament.surface)
-                        Text(
-                            surfaceName(tournament.surface),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }
-
-                if (liveCount > 0) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = Color.Red) {
-                        Text(
-                            "$liveCount LIVE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            color = Color.White,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+            }
+        }
+        
+        // Full-Time Toggle Button
+        Surface(
+            onClick = onToggleFinished,
+            color = if (finishedFilterActive) Color(0xFFE8F5E9) else Color(0xFFF5F5F5),
+            shape = CircleShape,
+            modifier = Modifier.height(40.dp),
+            border = if (finishedFilterActive) BorderStroke(1.dp, Color(0xFF4CAF50).copy(alpha = 0.5f)) else null
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            if (finishedFilterActive) Color(0xFF4CAF50) else Color.Gray,
+                            CircleShape
                         )
+                )
+                Text(
+                    "FT",
+                    color = if (finishedFilterActive) Color(0xFF2E7D32) else Color.DarkGray,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (finishedFilterActive) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // Date indicator (optional placeholder for "Heute")
+        Text(
+            "Heute",
+            color = AuraPurple,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun <T> FilterSection(
+    title: String,
+    options: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, color = Color.White.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { option ->
+                val isSelected = option == selected
+                
+                val scale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.05f else 1f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                    label = "chipScale"
+                )
+
+                Surface(
+                    onClick = { onSelect(option) },
+                    color = if (isSelected) AuraLime else Color.White.copy(alpha = 0.1f),
+                    shape = CircleShape,
+                    modifier = Modifier.scale(scale)
+                ) {
+                    Text(
+                        text = option.toString(),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = if (isSelected) AuraDeep else Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TournamentBanner(
+    tournament: Tournament,
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 0f else -90f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow)
+    )
+    val liveCount = tournament.matches.count { it.status == MatchStatus.LIVE }
+
+    val surfaceColor = when (tournament.surface) {
+        Surface.CLAY -> ClayColor
+        Surface.GRASS -> GrassColor
+        Surface.HARD -> HardColor
+        Surface.INDOOR_HARD -> IndoorColor
+        Surface.UNKNOWN -> Color.Gray
+    }
+
+    val surfaceName = when (tournament.surface) {
+        Surface.CLAY -> "Sand"
+        Surface.GRASS -> "Rasen"
+        Surface.HARD -> "Hartplatz"
+        Surface.INDOOR_HARD -> "Hartplatz (H)"
+        Surface.UNKNOWN -> "Unbekannt"
+    }
+
+    val points = tournament.category.points.takeIf { it > 0 }?.let { "$it Pts" } ?: ""
+
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = AuraDeep,
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Surface Color Accent Line
+            Box(
+                Modifier
+                    .size(3.dp, 42.dp)
+                    .background(surfaceColor, RoundedCornerShape(2.dp))
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                // City / short name (top)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = (tournament.location ?: tournament.name.replace(Regex("""\s*\(.*?\)"""), "").trim()).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (liveCount > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(modifier = Modifier.size(6.dp).background(Color.Red, CircleShape))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "$liveCount LIVE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Red,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                // Category label + Singles/Doubles badge
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = tournament.category.displayName.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.55f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (tournament.type != null) {
+                        Spacer(Modifier.width(6.dp))
+                        val isDoubles = tournament.type == "Doubles"
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Color.White.copy(alpha = 0.2f),
+                                    RoundedCornerShape(3.dp)
+                                )
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = if (isDoubles) "D" else "S",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                tint = Color.White.copy(alpha = 0.3f)
+            )
+        }
+    }
+}
+
+@Composable
+fun MatchRow(
+    match: TennisMatch,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isFinished = match.status == MatchStatus.FINISHED
+    val isLive = match.status == MatchStatus.LIVE
+    val isTbd = match.status == MatchStatus.TBD
+
+    val cardAlpha = if (isFinished) 0.55f else 1f
+
+    val isUpcoming = !isLive && !isFinished && !isTbd
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .graphicsLayer { alpha = cardAlpha },
+        shape = RoundedCornerShape(10.dp),
+        color = when {
+            isLive -> Color(0xFFFFF3F3)
+            isFinished -> Color(0xFFF2F2F2)
+            else -> Color(0xFFF9F9F9)
+        },
+        border = BorderStroke(
+            width = if (isLive) 1.5.dp else 1.dp,
+            color = if (isLive) Color.Red.copy(alpha = 0.4f) else Color.LightGray.copy(alpha = 0.3f)
+        )
+    ) {
+        if (isUpcoming) {
+            Row(
+                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Time
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(56.dp)
+                ) {
+                    Text(
+                        text = match.time,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.DarkGray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                // Players
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PlayerRow(player = match.homePlayer, isWinner = false, isServing = false, score = null)
+                    PlayerRow(player = match.awayPlayer, isWinner = false, isServing = false, score = null)
+                }
+                // Dash instead of score
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = Color.LightGray)
+                    Text("-", style = MaterialTheme.typography.titleMedium, color = Color.LightGray)
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        } else {
+            // Live / Finished layout matching reference design
+            val sets = match.score?.split(",")?.map { it.trim() } ?: emptyList()
+            // Per-set scores for each player: sets[i] = "6-4" → home=6, away=4
+            val homeSets = sets.map { it.split("-").getOrNull(0) ?: "" }
+            val awaySets = sets.map { it.split("-").getOrNull(1) ?: "" }
+            val gameScoreParts = match.gameScore?.split("-")
+            val homeGame = gameScoreParts?.getOrNull(0) ?: ""
+            val awayGame = gameScoreParts?.getOrNull(1) ?: ""
+
+            Row(
+                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: status badge + round
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.width(56.dp)
+                ) {
+                    if (isLive) {
+                        Surface(
+                            color = Color.Red,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                LivePulsingDot()
+                                Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text("FT", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Players
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center // Center the two rows together
+                ) {
+                    PlayerRow(
+                        player = match.homePlayer,
+                        isWinner = match.winnerKey == match.homePlayer.key,
+                        isServing = match.isHomeServing == true && isLive,
+                        score = null
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    PlayerRow(
+                        player = match.awayPlayer,
+                        isWinner = match.winnerKey == match.awayPlayer.key,
+                        isServing = match.isHomeServing == false && isLive,
+                        score = null
+                    )
+                }
+
+                // Score columns
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Set scores
+                    homeSets.forEachIndexed { i, homeScore ->
+                        val awayScore = awaySets.getOrNull(i) ?: ""
+                        
+                        fun parseGames(s: String): Int {
+                            return when {
+                                "(" in s -> s.substring(0, s.indexOf("(")).trim().toIntOrNull() ?: 0
+                                "." in s -> s.substring(0, s.indexOf(".")).trim().toIntOrNull() ?: 0
+                                else -> s.trim().toIntOrNull() ?: 0
+                            }
+                        }
+
+                        val h = parseGames(homeScore)
+                        val a = parseGames(awayScore)
+                        val homeWonSet = (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2)
+                        val awayWonSet = (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
+                        val setDone = homeWonSet || awayWonSet
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            ScoreText(homeScore, homeWonSet, setDone)
+                            Spacer(Modifier.height(8.dp))
+                            ScoreText(awayScore, awayWonSet, setDone)
+                        }
+                    }
+                    // Current game score (live only)
+                    if (isLive && match.gameScore != null) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+                                Text(homeGame, style = MaterialTheme.typography.titleMedium, color = Color.Red, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Box(Modifier.height(32.dp), contentAlignment = Alignment.Center) {
+                                Text(awayGame, style = MaterialTheme.typography.titleMedium, color = Color.Red, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
 
                 Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    imageVector = Icons.Default.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.4f),
-                    modifier = Modifier.size(20.dp)
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(16.dp)
                 )
             }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter   = expandVertically() + fadeIn(),
-                exit    = shrinkVertically() + fadeOut()
+        }
+    }
+}
+
+@Composable
+private fun ScoreText(
+    score: String,
+    isWinner: Boolean,
+    setDone: Boolean,
+    color: Color? = null
+) {
+    val games = when {
+        "(" in score -> score.substring(0, score.indexOf("("))
+        "." in score -> score.substring(0, score.indexOf("."))
+        else -> score
+    }
+    val tbPoints = when {
+        "(" in score -> score.substring(score.indexOf("(") + 1, score.indexOf(")"))
+        "." in score -> score.substring(score.indexOf(".") + 1)
+        else -> null
+    }
+    val hasDot = "." in score
+
+    Row(
+        modifier = Modifier
+            .height(32.dp)
+            .widthIn(min = 22.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = if (hasDot) "$games." else games,
+            style = MaterialTheme.typography.titleMedium.copy(
+                lineHeight = 32.sp,
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            ),
+            fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
+            color = color ?: when {
+                !setDone -> Color.Gray
+                isWinner -> Color.Black
+                else -> Color.Gray
+            },
+            textAlign = TextAlign.Center
+        )
+        if (tbPoints != null) {
+            Text(
+                text = tbPoints,
+                fontSize = 10.sp, 
+                fontWeight = FontWeight.Bold,
+                color = color?.copy(alpha = 0.7f) ?: if (isWinner) Color.Black.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.6f),
+                modifier = Modifier.align(Alignment.Top)
+            )
+        }
+    }
+}
+
+@Composable
+fun PlayerRow(
+    player: Player,
+    isWinner: Boolean,
+    isServing: Boolean,
+    score: String?
+) {
+    Row(
+        modifier = Modifier.height(32.dp), // Match ScoreText height
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Player image with live-ranking badge (lime circle) on the avatar
+        Box(contentAlignment = Alignment.BottomCenter) {
+            com.lenz.tennisapp.ui.components.PlayerAvatarWithRanking(
+                player = player,
+                size = 28.dp,
+                rankingFontSize = 8.sp,
+                badgeSize = 13.dp
+            )
+            // Small badge at the bottom of avatar
+            Surface(
+                color = AuraLime,
+                shape = CircleShape,
+                modifier = Modifier.size(10.dp).offset(y = 3.dp),
+                border = BorderStroke(1.dp, AuraDeep)
             ) {
-                Column(
-                    modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    HorizontalDivider(color = TennisGreen.copy(alpha = 0.2f), modifier = Modifier.padding(bottom = 4.dp))
-                    sortedMatches.forEach { match ->
-                        MatchCard(
-                            match = match,
-                            onClick = { onMatchClick(match.id) },
-                            userPrediction = predictions[match.id],
-                            onPredict = if (match.status == MatchStatus.NOT_STARTED) {
-                                { wKey, wName ->
-                                    onPredict(
-                                        match.id, match.date, match.tournament,
-                                        match.homePlayer.key, match.homePlayer.name,
-                                        match.awayPlayer.key, match.awayPlayer.name,
-                                        wKey, wName
-                                    )
-                                }
-                            } else null
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center) {
+                    Text("-", color = AuraDeep, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.offset(y = (-1).dp))
                 }
             }
         }
-    }
-}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+        Spacer(Modifier.width(8.dp))
 
-@Composable
-private fun SurfaceDot(surface: CourtSurface) {
-    Box(
-        modifier = Modifier
-            .size(8.dp)
-            .clip(CircleShape)
-            .background(surfaceColor(surface))
-    )
-}
-
-private fun surfaceColor(surface: CourtSurface) = when (surface) {
-    CourtSurface.CLAY        -> ClayColor
-    CourtSurface.GRASS       -> GrassColor
-    CourtSurface.HARD        -> HardColor
-    CourtSurface.INDOOR_HARD -> IndoorColor
-    CourtSurface.UNKNOWN     -> Color.Gray
-}
-
-private fun surfaceName(surface: CourtSurface) = when (surface) {
-    CourtSurface.CLAY        -> "Sand"
-    CourtSurface.GRASS       -> "Rasen"
-    CourtSurface.HARD        -> "Hard"
-    CourtSurface.INDOOR_HARD -> "Indoor"
-    CourtSurface.UNKNOWN     -> "—"
-}
-
-private fun categoryPoints(cat: TournamentCategory, tournamentName: String = "") = when (cat) {
-    TournamentCategory.GRAND_SLAM                                    -> "2000"
-    TournamentCategory.ATP_MASTERS_1000, TournamentCategory.WTA_1000 -> "1000"
-    TournamentCategory.ATP_500,          TournamentCategory.WTA_500  -> "500"
-    TournamentCategory.ATP_250,          TournamentCategory.WTA_250  -> "250"
-    TournamentCategory.CHALLENGER -> {
-        // ATP Challengers: extract point level from name (e.g. "Bordeaux 175" → "175")
-        val match = Regex("(175|125|100|75)").find(tournamentName)
-        match?.value ?: "Chal."
-    }
-    TournamentCategory.ITF -> {
-        // ITF events: extract M/W prefix (e.g. "M25 Klosters" → "25", "W75 Blois" → "75")
-        val match = Regex("^[MWmw](\\d+)").find(tournamentName.trim())
-        match?.groupValues?.get(1) ?: "ITF"
-    }
-    TournamentCategory.OTHER -> "—"
-}
-
-private fun categoryColor(cat: TournamentCategory) = when (cat) {
-    TournamentCategory.GRAND_SLAM                                      -> SlamGold
-    TournamentCategory.ATP_MASTERS_1000, TournamentCategory.WTA_1000   -> Masters1000Color
-    TournamentCategory.ATP_500,          TournamentCategory.WTA_500    -> Atp500Color
-    TournamentCategory.ATP_250,          TournamentCategory.WTA_250    -> Atp250Color
-    TournamentCategory.CHALLENGER                                      -> ChallengerColor
-    else                                                               -> Color.Gray
-}
-
-private fun categoryColor(cat: FilterCategory): Color = when (cat) {
-    FilterCategory.GRAND_SLAM -> SlamGold
-    FilterCategory.MASTERS    -> Masters1000Color
-    FilterCategory.FIVE00     -> Atp500Color
-    FilterCategory.TWO50      -> Atp250Color
-    FilterCategory.CHALLENGER -> ChallengerColor
-    FilterCategory.ITF        -> Color.Gray
-}
-
-@Composable
-private fun DateNavigator(
-    date: LocalDate,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onToday: () -> Unit
-) {
-    val isToday = date == LocalDate.now()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (!isToday) {
-            TextButton(onClick = onToday) {
-                Text("Heute", color = AuraLime, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+        if (isServing) {
+            Surface(
+                color = AuraLime,
+                shape = CircleShape,
+                modifier = Modifier.size(18.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.SportsTennis,
+                        contentDescription = "Serving",
+                        tint = AuraDeep,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
             }
+            Spacer(Modifier.width(8.dp))
         }
-        IconButton(onClick = onPrevious, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.ChevronLeft, null, tint = Color.White.copy(alpha = 0.7f))
-        }
-        IconButton(onClick = onNext, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(alpha = 0.7f))
-        }
+
+        // Name
+        Text(
+            text = player.name.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
+            color = if (isWinner) Color.Black else Color.DarkGray,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
+}
+
+@Composable
+fun LivePulsingDot() {
+    val transition = rememberInfiniteTransition()
+    val alpha by transition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse)
+    )
+    Box(
+        Modifier
+            .size(8.dp)
+            .graphicsLayer { this.alpha = alpha }
+            .background(Color.Red, CircleShape)
+    )
 }

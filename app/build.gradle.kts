@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,15 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+// Release signing: read from CI env vars first, else local keystore.properties.
+// Falls back to null (unsigned) when neither is present.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
+}
+fun signingValue(envKey: String, propKey: String): String? =
+    System.getenv(envKey) ?: keystoreProps.getProperty(propKey)
 
 android {
     namespace = "com.lenz.tennisapp"
@@ -18,10 +29,25 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = signingValue("KEYSTORE_FILE", "storeFile")
+            if (storeFilePath != null) {
+                storeFile = rootProject.file(storeFilePath)
+                storePassword = signingValue("KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Only attach the signing config when a keystore is actually available.
+            val rel = signingConfigs.getByName("release")
+            if (rel.storeFile != null) signingConfig = rel
         }
     }
     compileOptions {
@@ -33,7 +59,10 @@ android {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -48,6 +77,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons)
+    implementation("androidx.compose.runtime:runtime-livedata")
     debugImplementation(libs.androidx.ui.tooling)
 
     // Navigation + Lifecycle

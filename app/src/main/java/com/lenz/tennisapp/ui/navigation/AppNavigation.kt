@@ -23,20 +23,26 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.*
 import androidx.navigation.compose.*
 import com.lenz.tennisapp.TennisApplication
 import com.lenz.tennisapp.ui.components.GreenHeader
 import com.lenz.tennisapp.ui.screens.home.HomeScreen
+import com.lenz.tennisapp.ui.screens.home.HomeViewModel
 import com.lenz.tennisapp.ui.screens.match.MatchDetailScreen
 import com.lenz.tennisapp.ui.screens.player.PlayerDetailScreen
 import com.lenz.tennisapp.ui.screens.tournament.TournamentDetailScreen
 import com.lenz.tennisapp.ui.screens.predictions.PredictionsScreen
 import com.lenz.tennisapp.ui.screens.settings.SettingsScreen
 import com.lenz.tennisapp.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 
 sealed class Screen(
     val route: String,
@@ -45,9 +51,9 @@ sealed class Screen(
     val iconSelected: ImageVector,
     val tabIndex: Int
 ) {
-    object Home        : Screen("home",        "Heute",     Icons.Outlined.SportsTennis, Icons.Filled.SportsTennis, 0)
-    object Predictions : Screen("predictions", "Prognosen", Icons.Outlined.Lightbulb,    Icons.Filled.Lightbulb, 1)
-    object Settings    : Screen("settings",    "Mehr",      Icons.Outlined.Settings,     Icons.Filled.Settings, 2)
+    object Home        : Screen("home",        "Heute",     Icons.Outlined.SportsTennis,       Icons.Filled.SportsTennis, 0)
+    object Predictions : Screen("predictions", "Prognosen", Icons.Outlined.Lightbulb,          Icons.Filled.Lightbulb, 1)
+    object Settings    : Screen("settings",    "Mehr",      Icons.Outlined.Settings,           Icons.Filled.Settings, 2)
 }
 
 val bottomNavItems = listOf(Screen.Home, Screen.Predictions, Screen.Settings)
@@ -61,6 +67,38 @@ fun AppNavigation(initialRoute: String? = null, initialMatchId: String? = null) 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppMainContent(initialRoute: String? = null, initialMatchId: String? = null) {
+    val homeViewModel: HomeViewModel = hiltViewModel()
+    val isDataReady by homeViewModel.isDataReady.collectAsStateWithLifecycle()
+    val liveCount by homeViewModel.liveCount.collectAsStateWithLifecycle()
+    var splashVisible by remember { mutableStateOf(true) }
+
+    // Logic to hide splash when data is ready
+    LaunchedEffect(isDataReady) {
+        if (isDataReady) {
+            delay(400) // Minimum display time
+            splashVisible = false
+        }
+    }
+
+    // Status bar style adjustment
+    val view = androidx.compose.ui.platform.LocalView.current
+    val window = (view.context as? android.app.Activity)?.window
+    if (window != null && !view.isInEditMode) {
+        SideEffect {
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !splashVisible
+            
+            // Initial/Default navigation bar setup
+            if (splashVisible) {
+                window.navigationBarColor = android.graphics.Color.parseColor("#1D1B20") // AuraDeep
+                controller.isAppearanceLightNavigationBars = false
+            } else {
+                window.navigationBarColor = android.graphics.Color.WHITE
+                controller.isAppearanceLightNavigationBars = true
+            }
+        }
+    }
+
     val navController = rememberNavController()
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStack?.destination?.route
@@ -82,20 +120,16 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         bottomNavItems.find { it.route == currentRoute }?.tabIndex
     }
 
-    val pagerState = rememberPagerState(initialPage = 0) { 3 }
+    val pagerState = rememberPagerState(initialPage = 0) { bottomNavItems.size }
 
     // Snappier sync from NavController to Pager
     LaunchedEffect(currentTabIndex) {
         if (currentTabIndex != null && currentTabIndex != pagerState.currentPage) {
-            pagerState.animateScrollToPage(
-                page = currentTabIndex,
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-            )
+            pagerState.scrollToPage(currentTabIndex)
         }
     }
 
     // NEW: Smooth sync from Pager swipe to NavController
-    // This only triggers when the page has fully settled, preventing "stuck" states
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { settledPage ->
             val targetRoute = bottomNavItems[settledPage].route
@@ -109,7 +143,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         }
     }
 
-    val showBottomBar = currentTabIndex != null
+    val showBottomBar = currentTabIndex != null && !splashVisible
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -117,31 +151,28 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         bottomBar = {
             if (showBottomBar) {
                 Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    // Soft transparent gradient overlay behind the navigation bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0f),
-                                        Color.White.copy(alpha = 0.8f),
-                                        Color.White
-                                    )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0f),
+                                    Color.White.copy(alpha = 0.8f),
+                                    Color.White
                                 )
                             )
-                    )
-
+                        ),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
                     Box(
                         modifier = Modifier
+                            .navigationBarsPadding()
                             .padding(bottom = 24.dp)
                     ) {
                         FloatingAuraNavigationBar(
                             selectedTabIndex = pagerState.currentPage,
+                            liveCount = if (pagerState.currentPage != 0) liveCount else 0,
                             onTabSelected = { index ->
                                 if (pagerState.currentPage != index) {
                                     val targetRoute = bottomNavItems[index].route
@@ -150,7 +181,6 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                                         launchSingleTop = true
                                         restoreState = true
                                     }
-                                    // Pager sync will happen via the LaunchedEffect(currentTabIndex)
                                 }
                             }
                         )
@@ -162,20 +192,21 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)
                 .padding(bottom = if (showBottomBar) 0.dp else innerPadding.calculateBottomPadding())
         ) {
             if (showBottomBar) {
                 GreenHeader(
                     title    = when (pagerState.currentPage) {
-                        0    -> "Tennis Today"
-                        1    -> "AI Predictor"
-                        2    -> "Settings"
+                        0 -> "Tennis Today"
+                        1 -> "AI Predictor"
+                        2 -> "Settings"
                         else -> "Tennis"
                     },
                     subtitle = when (pagerState.currentPage) {
-                        0    -> "Matches & News"
-                        1    -> "Hit rate statistics"
-                        2    -> "System config"
+                        0 -> "Matches"
+                        1 -> "Hit rate statistics"
+                        2 -> "System config"
                         else -> null
                     },
                     court = TennisApplication.sessionCourt,
@@ -185,15 +216,15 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = showBottomBar,
+                modifier = Modifier.fillMaxSize().background(Color.White),
+                userScrollEnabled = true,
                 beyondViewportPageCount = 1,
-                contentPadding = PaddingValues(bottom = if (showBottomBar) 110.dp else 0.dp)
+                contentPadding = PaddingValues(bottom = 0.dp)
             ) { page ->
                 when (page) {
                     0 -> HomeScreen(
                         onMatchClick = { navController.navigate("match/$it") },
-                        onTournamentClick = { leagueId, name ->
+                        onTournamentClick = { leagueId, name -> 
                             navController.navigate("tournament/$leagueId/$name")
                         },
                         showHeader = false
@@ -208,10 +239,10 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
             navController = navController,
             startDestination = Screen.Home.route,
             modifier = Modifier,
-            enterTransition = { fadeIn(tween(200)) },
-            exitTransition = { fadeOut(tween(180)) },
-            popEnterTransition = { fadeIn(tween(200)) },
-            popExitTransition = { fadeOut(tween(180)) }
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
         ) {
             composable(Screen.Home.route) {}
             composable(Screen.Predictions.route) {}
@@ -272,12 +303,138 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                 )
             }
         }
+
+        AnimatedVisibility(
+            visible = splashVisible,
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(400))
+        ) {
+            SplashOverlay()
+        }
+    }
+}
+
+@Composable
+private fun SplashOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AuraDeep),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            val transition = rememberInfiniteTransition("splashPulse")
+            val scale by transition.animateFloat(
+                initialValue = 0.9f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 1200
+                        0.9f at 0 with CubicBezierEasing(0.4f, 0f, 0.6f, 1f)
+                        1.1f at 600 with CubicBezierEasing(0.4f, 0f, 0.6f, 1f)
+                        0.9f at 1200
+                    },
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "splashScale"
+            )
+
+            val glowAlpha by transition.animateFloat(
+                initialValue = 0.12f,
+                targetValue = 0.38f,
+                animationSpec = infiniteRepeatable(
+                    animation = keyframes {
+                        durationMillis = 1200
+                        0.12f at 0 with CubicBezierEasing(0.4f, 0f, 0.6f, 1f)
+                        0.38f at 600 with CubicBezierEasing(0.4f, 0f, 0.6f, 1f)
+                        0.12f at 1200
+                    },
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "splashGlow"
+            )
+
+            Box(contentAlignment = Alignment.Center) {
+                // Background glow
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .graphicsLayer { alpha = glowAlpha }
+                        .clip(CircleShape)
+                        .background(AuraLime.copy(alpha = 0.4f))
+                )
+
+                // Main icon box
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .clip(CircleShape)
+                        .background(AuraLime),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SportsTennis,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = AuraDeep
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Tennis Today",
+                    color = AuraLime,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp
+                )
+                Text(
+                    text = "WHERE AI MEETS THE BASELINE",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Placeholder for LivePulsingDot if needed
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(AuraLime)
+                )
+                Text(
+                    "Lade Spieltag …",
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 13.sp
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun FloatingAuraNavigationBar(
     selectedTabIndex: Int,
+    liveCount: Int = 0,
     onTabSelected: (Int) -> Unit
 ) {
     Surface(
@@ -298,10 +455,10 @@ fun FloatingAuraNavigationBar(
                 val isSelected = selectedTabIndex == screen.tabIndex
                 
                 val scale by animateFloatAsState(
-                    targetValue = if (isSelected) 1.2f else 1.0f,
+                    targetValue = if (isSelected) 1.25f else 1.0f,
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium // Snappier stiffness
+                        stiffness = Spring.StiffnessHigh
                     ),
                     label = "scale"
                 )
@@ -338,14 +495,27 @@ fun FloatingAuraNavigationBar(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = if (isSelected) screen.iconSelected else screen.icon,
-                            contentDescription = screen.label,
-                            tint = tint,
-                            modifier = Modifier
-                                .size(26.dp)
-                                .scale(scale)
-                        )
+                        BadgedBox(
+                            badge = {
+                                if (screen == Screen.Home && liveCount > 0) {
+                                    Badge(
+                                        containerColor = Color.Red,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text(liveCount.toString())
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) screen.iconSelected else screen.icon,
+                                contentDescription = screen.label,
+                                tint = tint,
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .scale(scale)
+                            )
+                        }
                         
                         AnimatedVisibility(
                             visible = isSelected,

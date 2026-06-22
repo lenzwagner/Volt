@@ -6,45 +6,43 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.SportsTennis
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.lenz.tennisapp.TennisApplication
 import com.lenz.tennisapp.domain.model.*
-import com.lenz.tennisapp.ui.components.*
+import com.lenz.tennisapp.ui.components.H2HCard
 import com.lenz.tennisapp.ui.theme.*
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,31 +55,57 @@ fun MatchDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF7F7F7))) {
         when (val s = state) {
             is MatchDetailUiState.Error -> {
-                ErrorView(message = s.message, onBack = onBack, onRetry = viewModel::loadDetail)
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(s.message, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(12.dp))
+                    Button(onClick = viewModel::loadDetail) { Text("Retry") }
+                    TextButton(onClick = onBack) { Text("Back") }
+                }
             }
             is MatchDetailUiState.Loaded -> {
                 val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = viewModel::loadDetail,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    MatchDetailContent(
-                        detail         = s.detail,
-                        userPrediction = s.userPrediction,
-                        onPredict      = viewModel::predict,
-                        onBack         = onBack,
-                        onRefresh      = viewModel::loadDetail,
-                        onPlayerClick  = onPlayerClick,
-                        onTournamentClick = onTournamentClick
-                    )
+                val listState = rememberLazyListState()
+                
+                // Show sticky header when we scrolled past the main header (item 1)
+                val showStickyHeader by remember {
+                    derivedStateOf { listState.firstVisibleItemIndex >= 2 }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = viewModel::refresh,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        MatchDetailContent(
+                            detail = s.detail,
+                            listState = listState,
+                            onBack = onBack,
+                            onRefresh = viewModel::refresh,
+                            onPlayerClick = onPlayerClick,
+                            onTournamentClick = onTournamentClick
+                        )
+                    }
+
+                    // Sticky Banner
+                    AnimatedVisibility(
+                        visible = showStickyHeader,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically(),
+                        modifier = Modifier.align(Alignment.TopCenter).zIndex(2f)
+                    ) {
+                        StickyMatchBanner(
+                            match = s.detail.match,
+                            onBack = onBack
+                        )
+                    }
                 }
             }
             else -> {
@@ -94,665 +118,1087 @@ fun MatchDetailScreen(
 }
 
 @Composable
+private fun StickyMatchBanner(
+    match: TennisMatch,
+    onBack: () -> Unit
+) {
+    val court = com.lenz.tennisapp.TennisApplication.sessionCourt
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = court.imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize().blur(10.dp)
+        )
+        Box(modifier = Modifier.matchParentSize().background(Color(0xFF0A0A14).copy(alpha = 0.65f)))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).fillMaxWidth())
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
+                }
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        match.homePlayer.name.split(" ").last().uppercase(),
+                        fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White
+                    )
+                    Text(
+                        " vs ",
+                        fontSize = 11.sp, color = Color.White.copy(alpha = 0.45f),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Text(
+                        match.awayPlayer.name.split(" ").last().uppercase(),
+                        fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(48.dp))
+            }
+        }
+    }
+}
+
+@Composable
 private fun MatchDetailContent(
     detail: MatchDetail,
-    userPrediction: UserPrediction? = null,
-    onPredict: (winnerKey: String, winnerName: String) -> Unit = { _, _ -> },
-    onBack: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onPlayerClick: (playerKey: String, playerName: String) -> Unit = { _, _ -> },
-    onTournamentClick: (leagueId: String, name: String) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    listState: LazyListState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onPlayerClick: (String, String) -> Unit,
+    onTournamentClick: (String, String) -> Unit
 ) {
+    val match = detail.match
+
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 40.dp)
     ) {
-        // Hero Header (Image + Player Avatars)
+        // ── Top bar ──────────────────────────────────────────────────────────
         item {
-            MatchHeroHeader(
-                match = detail.match,
+            MatchHeader(
+                match = match,
                 onBack = onBack,
                 onRefresh = onRefresh,
                 onPlayerClick = onPlayerClick
             )
         }
 
-        // 1. Tournament Breadcrumb Banner
+        // ── Section gap ──────────────────────────────────────────────────────
+        item { Spacer(Modifier.height(12.dp)) }
+
+        // ── Aktuelle Form ────────────────────────────────────────────────────
         item {
-            TournamentBreadcrumbBanner(
-                tournament = detail.match.tournament,
-                category = detail.match.tournamentCategory,
-                round = detail.match.round,
-                onClick = { onTournamentClick(detail.match.leagueId, detail.match.tournament) },
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
+            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                FormSection(
+                    p1 = match.homePlayer,
+                    p2 = match.awayPlayer,
+                    p1Matches = detail.homeRecentMatches,
+                    p2Matches = detail.awayRecentMatches
+                )
+            }
         }
 
-        // 2. Odds Card (Spielende)
-        if (detail.odds.isNotEmpty()) {
-            item {
-                OddsSummaryCard(
+        item { Spacer(Modifier.height(12.dp)) }
+
+        // ── Ranglisten ───────────────────────────────────────────────────────
+        item {
+            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                RankingSection(
+                    p1 = match.homePlayer,
+                    p2 = match.awayPlayer,
+                    p1Elo = detail.player1Elo,
+                    p2Elo = detail.player2Elo
+                )
+            }
+        }
+
+        item { Spacer(Modifier.height(12.dp)) }
+
+        // ── AI Prediction ────────────────────────────────────────────────────
+        item {
+            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                AIPredictionSection(
+                    prediction = detail.prediction,
+                    p1Name = match.homePlayer.name,
+                    p2Name = match.awayPlayer.name
+                )
+            }
+        }
+
+        item { Spacer(Modifier.height(12.dp)) }
+
+        // ── Wettquoten ───────────────────────────────────────────────────────
+        item {
+            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                OddsSection(
                     odds = detail.odds,
-                    modifier = Modifier.padding(horizontal = 12.dp).animateItem()
+                    p1 = match.homePlayer,
+                    p2 = match.awayPlayer
                 )
             }
         }
 
-        // 3. Match Summary (FT - Chart - Score)
+        item { Spacer(Modifier.height(12.dp)) }
+
+        // ── H2H ─────────────────────────────────────────────────────────────
         item {
-            MatchSummaryCard(
-                match = detail.match,
-                modifier = Modifier.padding(horizontal = 12.dp).animateItem()
-            )
+            H2HCard(h2h = detail.h2h, modifier = Modifier.padding(horizontal = 12.dp))
         }
 
-        // 4. Set Breakdown (Expandable Sections)
-        val sets = detail.match.score?.split(",") ?: emptyList()
-        sets.reversed().forEachIndexed { index, score ->
-            item {
-                val setNum = sets.size - index
-                SetCollapsibleSection(
-                    title = "$setNum. Satz",
-                    match = detail.match,
-                    setScore = score,
-                    isInitiallyExpanded = index == 0,
-                    modifier = Modifier.padding(horizontal = 12.dp).animateItem()
-                )
-            }
-        }
+        item { Spacer(Modifier.height(12.dp)) }
 
-        // 5. Who will win? (User Pick section)
+        // ── Preisgeld ────────────────────────────────────────────────────────
         item {
-            WhoWillWinCard(
-                prediction = detail.prediction,
-                p1 = detail.match.homePlayer,
-                p2 = detail.match.awayPlayer,
-                userPrediction = userPrediction,
-                onPredict = onPredict,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-        }
-
-        // 6. Rankings Comparison (WTA/ATP + ELO)
-        item {
-            RankingComparisonCard(
-                p1 = detail.match.homePlayer,
-                p2 = detail.match.awayPlayer,
-                p1Elo = detail.player1Elo,
-                p2Elo = detail.player2Elo,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-        }
-
-        // 7. Match Info Card (Stadium, City, Surface)
-        item {
-            MatchInfoCard(
-                match = detail.match,
-                modifier = Modifier.padding(horizontal = 12.dp)
-            )
-        }
-    }
-}
-
-// ─── Sub-Components ──────────────────────────────────────────────────────────
-
-@Composable
-private fun TournamentBreadcrumbBanner(
-    tournament: String,
-    category: TournamentCategory,
-    round: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth().clickable { onClick() },
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(AuraLime, RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("🎾", fontSize = 12.sp)
-            }
-            Text(
-                text = "Tennis, ${category.displayName}, $tournament${round?.let { ", $it" } ?: ""}",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = AuraDeep,
-                modifier = Modifier.weight(1f),
-                maxLines = 1
-            )
-            Icon(Icons.Default.ChevronRight, null, tint = AuraPurple, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun OddsSummaryCard(
-    odds: List<BookmakerOdds>,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("QUOTEN", style = MaterialTheme.typography.labelSmall, color = AuraPurple, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-            Spacer(Modifier.height(12.dp))
-            
-            odds.take(2).forEach { o ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Surface(
-                        modifier = Modifier.width(64.dp).height(30.dp),
-                        color = AuraDeep,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(o.bookmakerName.take(3).uppercase(), color = AuraLime, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                        }
-                    }
-                    
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("1", color = AuraPurple, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                            Spacer(Modifier.weight(1f))
-                            Text(String.format(Locale.US, "%.2f", o.homeOdds), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AuraDeep)
-                        }
-                    }
-                    
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                            Text("2", color = AuraPurple, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                            Spacer(Modifier.weight(1f))
-                            Text(String.format(Locale.US, "%.2f", o.awayOdds), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AuraDeep)
-                        }
-                    }
-                }
+            SectionCard(modifier = Modifier.padding(horizontal = 12.dp)) {
+                PreisgeldSection(p1 = match.homePlayer, p2 = match.awayPlayer)
             }
         }
     }
 }
 
-@Composable
-private fun MatchSummaryCard(
-    match: TennisMatch,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val statusText = when (match.status) {
-                    MatchStatus.FINISHED -> "GAME OVER"
-                    MatchStatus.LIVE -> "LIVE NOW"
-                    else -> "UPCOMING"
-                }
-                Surface(color = AuraDeep, shape = RoundedCornerShape(6.dp)) {
-                    Text(
-                        statusText, 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = AuraLime, 
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Icon(Icons.Default.Info, null, tint = AuraPurple.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
-            }
-            
-            Spacer(Modifier.height(20.dp))
-            
-            // Match progress visual (Dynamic Waveform style)
-            val infiniteTransition = rememberInfiniteTransition(label = "waveform")
-            Row(
-                modifier = Modifier.fillMaxWidth().height(60.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(24) { i ->
-                    val isHome = i % 3 == 0
-                    val animHeight by infiniteTransition.animateFloat(
-                        initialValue = if (isHome) 20f else 10f,
-                        targetValue = if (isHome) 45f else 25f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1000 + (i * 50), easing = LinearOutSlowInEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "bar_height"
-                    )
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(animHeight.dp)
-                            .background(
-                                if (isHome) AuraPurple else AuraLime, 
-                                RoundedCornerShape(4.dp)
-                            )
-                    )
-                }
-            }
-            
-            Spacer(Modifier.height(20.dp))
-            
-            // Large Result Boxes
-            val scores = match.score?.split(",") ?: emptyList()
-            var p1Sets = 0
-            var p2Sets = 0
-            scores.forEach { s ->
-                val p = s.split("-")
-                if (p.size == 2) {
-                    val s1 = p[0].trim().toIntOrNull() ?: 0
-                    val s2 = p[1].trim().toIntOrNull() ?: 0
-                    if (s1 > s2) p1Sets++ else if (s2 > s1) p2Sets++
-                }
-            }
-            
-            Box(contentAlignment = Alignment.Center) {
-                // Background Watermark for Score
-                Text(
-                    text = "$p1Sets-$p2Sets",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 120.sp,
-                        fontWeight = FontWeight.Black
-                    ),
-                    color = AuraPurple.copy(alpha = 0.05f),
-                    modifier = Modifier.offset(y = (-10).dp)
-                )
+// ─── Round translation ────────────────────────────────────────────────────────
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    BigScoreBox(p1Sets.toString(), isActive = p1Sets >= p2Sets)
-                    BigScoreBox(p2Sets.toString(), isActive = p2Sets > p1Sets)
-                }
-            }
-        }
+private fun translateRound(round: String): String {
+    val r = round.lowercase().trim()
+    return when {
+        r.contains("final") && r.contains("quarter") -> "Viertelfinale"
+        r.contains("final") && r.contains("semi")    -> "Halbfinale"
+        r.contains("final")                          -> "Finale"
+        r.contains("round of 64")  || r == "r64"    -> "Runde der letzten 64"
+        r.contains("round of 32")  || r == "r32"    -> "Runde der letzten 32"
+        r.contains("round of 16")  || r == "r16"    -> "Achtelfinale"
+        r.contains("round of 128") || r == "r128"   -> "Runde der letzten 128"
+        r.contains("1st round") || r.contains("first round") || r == "r1" -> "1. Runde"
+        r.contains("2nd round") || r.contains("second round") || r == "r2" -> "2. Runde"
+        r.contains("3rd round") || r.contains("third round")  || r == "r3" -> "3. Runde"
+        r.contains("4th round") || r.contains("fourth round") || r == "r4" -> "4. Runde"
+        r.contains("qualifying") -> "Qualifikation"
+        r.contains("group") -> "Gruppenphase"
+        else -> round
     }
 }
 
-@Composable
-private fun BigScoreBox(value: String, isActive: Boolean) {
-    val scale by animateFloatAsState(
-        targetValue = if (isActive) 1.1f else 1.0f,
-        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
-        label = "score_box_scale"
-    )
-
-    Surface(
-        modifier = Modifier.size(64.dp, 72.dp).scale(scale),
-        color = if (isActive) AuraLime else Color.White.copy(alpha = 0.4f),
-        shape = RoundedCornerShape(
-            topStart = 20.dp, 
-            topEnd = 8.dp, 
-            bottomStart = 8.dp, 
-            bottomEnd = 20.dp
-        ),
-        border = if (!isActive) BorderStroke(1.dp, Color.White) else null
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(value, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = if (isActive) AuraDeep else Color.LightGray.copy(alpha = 0.5f))
-        }
-    }
-}
+// ─── Match Header (TopBar + ScoreHeader as one seamless background) ──────────
 
 @Composable
-private fun SetCollapsibleSection(
-    title: String,
-    match: TennisMatch,
-    setScore: String,
-    isInitiallyExpanded: Boolean,
-    modifier: Modifier = Modifier
-) {
-    var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
-    
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(title.uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AuraDeep, letterSpacing = 1.sp)
-                Spacer(Modifier.weight(1f))
-                Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = AuraPurple)
-            }
-            
-            if (isExpanded) {
-                Spacer(Modifier.height(20.dp))
-                val games = listOf("6", "5", "4", "3", "2", "1", "0")
-                games.forEach { g ->
-                    GameDetailRow(
-                        gameNum = g,
-                        p1Name = match.homePlayer.name,
-                        p2Name = match.awayPlayer.name,
-                        isBreak = g.toInt() % 2 != 0
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GameDetailRow(gameNum: String, p1Name: String, p2Name: String, isBreak: Boolean) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(p1Name.split(" ").last().uppercase(), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.width(90.dp), color = AuraDeep)
-            Text(gameNum, fontWeight = FontWeight.Black, modifier = Modifier.width(28.dp), color = AuraPurple)
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("15", "30", "40", "A").forEach { pts ->
-                    Text(pts, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (pts == "A") AuraLime else Color.LightGray)
-                }
-            }
-        }
-        if (isBreak) {
-            Surface(color = AuraLime, shape = RoundedCornerShape(4.dp), modifier = Modifier.padding(start = 90.dp, top = 4.dp)) {
-                Text("BREAK", style = MaterialTheme.typography.labelSmall, color = AuraDeep, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-            Text(p2Name.split(" ").last().uppercase(), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(90.dp), color = Color.Gray)
-            Text("1", fontWeight = FontWeight.Medium, modifier = Modifier.width(28.dp), color = Color.Gray)
-            Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("0", "15", "30", "30").forEach { pts ->
-                    Text(pts, fontSize = 11.sp, color = Color.LightGray)
-                }
-            }
-            Box(modifier = Modifier.size(10.dp).background(AuraPurple, CircleShape))
-        }
-    }
-}
-
-@Composable
-private fun WhoWillWinCard(
-    prediction: MatchPrediction,
-    p1: Player,
-    p2: Player,
-    userPrediction: UserPrediction?,
-    onPredict: (String, String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("VOTING", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AuraPurple, letterSpacing = 1.sp)
-                Spacer(Modifier.weight(1f))
-                Icon(Icons.Default.Info, null, tint = AuraPurple.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.height(20.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PredictionPickItem(p1, prediction.player1WinPercent, isSelected = userPrediction?.predictedWinnerKey == p1.key, onClick = { onPredict(p1.key, p1.name) }, modifier = Modifier.weight(1f))
-                PredictionPickItem(p2, prediction.player2WinPercent, isSelected = userPrediction?.predictedWinnerKey == p2.key, onClick = { onPredict(p2.key, p2.name) }, modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun PredictionPickItem(player: Player, percent: Int, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    Surface(
-        modifier = modifier.clickable { onClick() },
-        color = if (isSelected) AuraPurple else Color.White,
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(modifier = Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(model = player.logoUrl, contentDescription = null, modifier = Modifier.size(36.dp).clip(CircleShape))
-            Text("$percent%", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, color = if (isSelected) Color.White else AuraDeep)
-        }
-    }
-}
-
-@Composable
-private fun RankingComparisonCard(
-    p1: Player,
-    p2: Player,
-    p1Elo: PlayerEloProfile?,
-    p2Elo: PlayerEloProfile?,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text("RANKINGS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = AuraPurple, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, letterSpacing = 1.sp)
-            Spacer(Modifier.height(24.dp))
-            
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(model = p1.logoUrl, contentDescription = null, modifier = Modifier.size(50.dp).clip(CircleShape))
-                
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    RankingRowComp("TOUR", p1.ranking?.toString() ?: "-", p2.ranking?.toString() ?: "-")
-                    RankingRowComp("ELO", p1Elo?.eloOverall?.toString() ?: "-", p2Elo?.eloOverall?.toString() ?: "-")
-                }
-                
-                AsyncImage(model = p2.logoUrl, contentDescription = null, modifier = Modifier.size(50.dp).clip(CircleShape))
-            }
-        }
-    }
-}
-
-@Composable
-private fun RankingRowComp(label: String, v1: String, v2: String) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(v1, color = AuraPurple, fontWeight = FontWeight.Black, fontSize = 14.sp, modifier = Modifier.width(44.dp))
-        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Surface(color = AuraDeep, shape = RoundedCornerShape(4.dp)) {
-                Text(label, color = AuraLime, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-            }
-        }
-        Text(v2, color = Color.Gray, fontWeight = FontWeight.Black, fontSize = 14.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
-    }
-}
-
-@Composable
-private fun MatchInfoCard(match: TennisMatch, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 0.dp,
-        border = BorderStroke(1.dp, AuraPurple.copy(alpha = 0.05f))
-    ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth().clickable { }, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(20.dp).background(AuraLime, CircleShape))
-                Spacer(Modifier.width(12.dp))
-                Text("Tennis, ${match.tournamentCategory.displayName}, ${match.tournament}", fontSize = 12.sp, color = AuraDeep, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Icon(Icons.Default.ChevronRight, null, tint = AuraPurple, modifier = Modifier.size(18.dp))
-            }
-            InfoLine("📅", "${match.date} • ${match.time.take(5)}")
-            InfoLine("🏟️", "Arthur Ashe Stadium")
-            InfoLine("📍", "New York, USA")
-            InfoLine("🎾", match.surface.displayName + " im Freien")
-        }
-    }
-}
-
-@Composable
-private fun InfoLine(icon: String, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(icon, fontSize = 18.sp)
-        Text(text, style = MaterialTheme.typography.bodySmall, color = AuraDeep, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun MatchHeroHeader(
+private fun MatchHeader(
     match: TennisMatch,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onPlayerClick: (String, String) -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().height(260.dp),
-        color = AuraPurple
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Organic Background
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-30).dp)
-                    .size(300.dp, 180.dp)
-                    .clip(RoundedCornerShape(bottomStart = 100.dp, bottomEnd = 100.dp))
-                    .alpha(0.3f)
-            ) {
-                val court = TennisApplication.sessionCourt
-                AsyncImage(model = court.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-
-            // Watermark
-            Text(
-                text = "MATCH",
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .offset(x = 30.dp, y = (-20).dp)
-                    .rotate(-10f)
-                    .alpha(0.1f),
-                style = MaterialTheme.typography.displayLarge.copy(fontSize = 150.sp, fontWeight = FontWeight.Black),
-                color = Color.White
+    val court = com.lenz.tennisapp.TennisApplication.sessionCourt
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = court.imageUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize().blur(10.dp)
+        )
+        Box(modifier = Modifier.matchParentSize().background(Color(0xFF0A0A14).copy(alpha = 0.62f)))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            TopBarContent(
+                tournament = match.tournament,
+                category = match.tournamentCategory,
+                round = match.round,
+                onBack = onBack,
+                onRefresh = onRefresh
             )
+            ScoreHeaderContent(match = match, onPlayerClick = onPlayerClick)
+        }
+    }
+}
 
-            Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
-                // Top Bar
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+@Composable
+private fun TopBarContent(
+    tournament: String,
+    category: TournamentCategory,
+    round: String?,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .fillMaxWidth()
+            .height(56.dp)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
+        }
+        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = tournament,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1
+            )
+            round?.let {
+                Text(
+                    text = translateRound(it),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.55f)
+                )
+            }
+        }
+        IconButton(onClick = onRefresh) {
+            Icon(Icons.Default.Refresh, "Aktualisieren", tint = Color.White.copy(alpha = 0.6f))
+        }
+    }
+}
+
+// ─── Score Header ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, String) -> Unit) {
+    val hasScoreData = !match.score.isNullOrBlank() && match.score != "-"
+    val isInPlay = match.status == MatchStatus.LIVE ||
+        (hasScoreData && match.status != MatchStatus.FINISHED)
+    val scoreParts = match.score?.takeIf { it.isNotBlank() && it != "-" }?.split(",") ?: emptyList()
+
+    data class SetInfo(val s1: Int, val s2: Int, val complete: Boolean)
+    val sets = scoreParts.map { s ->
+        val p = s.split("-")
+        val v1 = parseSetScore(p.getOrNull(0) ?: "0")
+        val v2 = parseSetScore(p.getOrNull(1) ?: "0")
+        SetInfo(v1, v2, isSetComplete(v1, v2))
+    }
+
+    val p1Sets = sets.count { it.complete && it.s1 > it.s2 }
+    val p2Sets = sets.count { it.complete && it.s2 > it.s1 }
+
+    val gameParts = match.gameScore?.takeIf { it.isNotBlank() && it != "-" }?.split("-")
+    val g1 = gameParts?.getOrNull(0)?.trim() ?: ""
+    val g2 = gameParts?.getOrNull(1)?.trim() ?: ""
+
+    val statusLabel = when (match.status) {
+        MatchStatus.LIVE -> "LIVE"
+        MatchStatus.FINISHED -> "Beendet"
+        else -> match.time.take(5)
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Surface(
+                color = Color.White.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    statusLabel,
+                    color = if (match.status == MatchStatus.LIVE) Color.Red else Color.White,
+                    fontWeight = FontWeight.Black, fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        PlayerScoreRow(
+            player = match.homePlayer,
+            isServing = match.isHomeServing == true && isInPlay,
+            sets = sets.map { it.s1 },
+            opponentSets = sets.map { it.s2 },
+            setsComplete = sets.map { it.complete },
+            totalSetsWon = p1Sets,
+            gamePoints = g1,
+            hasScore = hasScoreData,
+            isFinished = match.status == MatchStatus.FINISHED,
+            onClick = { onPlayerClick(match.homePlayer.key, match.homePlayer.name) }
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        PlayerScoreRow(
+            player = match.awayPlayer,
+            isServing = match.isHomeServing == false && isInPlay,
+            sets = sets.map { it.s2 },
+            opponentSets = sets.map { it.s1 },
+            setsComplete = sets.map { it.complete },
+            totalSetsWon = p2Sets,
+            gamePoints = g2,
+            hasScore = hasScoreData,
+            isFinished = match.status == MatchStatus.FINISHED,
+            onClick = { onPlayerClick(match.awayPlayer.key, match.awayPlayer.name) }
+        )
+    }
+}
+
+@Composable
+private fun PlayerScoreRow(
+    player: Player,
+    isServing: Boolean,
+    sets: List<Int>,         // this player's score per set
+    opponentSets: List<Int>, // opponent's score per set
+    setsComplete: List<Boolean>,
+    totalSetsWon: Int,
+    gamePoints: String,
+    hasScore: Boolean,
+    isFinished: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Avatar
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(44.dp)) {
+            if (!player.logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = player.logoUrl, contentDescription = player.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                        .border(2.dp, if (isServing) AuraLime else Color.Transparent, CircleShape)
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(44.dp).clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.15f))
+                        .border(2.dp, if (isServing) AuraLime else Color.Transparent, CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    IconButton(onClick = onBack, modifier = Modifier.background(AuraDeep.copy(alpha = 0.2f), CircleShape)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onRefresh, modifier = Modifier.background(Color.White.copy(alpha = 0.15f), CircleShape)) {
-                        Icon(Icons.Default.Refresh, "Aktualisieren", tint = Color.White)
-                    }
+                    Text(player.name.take(1).uppercase(), fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
                 }
+            }
+        }
 
-                // Center Content
-                Row(
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PlayerHeroAvatar(
-                        player = match.homePlayer,
-                        isServing = match.isHomeServing == true,
-                        onClick = { onPlayerClick(match.homePlayer.key, match.homePlayer.name) }
-                    )
+        Spacer(Modifier.width(10.dp))
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (match.status == MatchStatus.LIVE || match.status == MatchStatus.FINISHED) {
-                            val scoreParts = match.score?.split(",") ?: emptyList()
-                            var p1S = 0; var p2S = 0
-                            scoreParts.forEach { s ->
-                                val p = s.split("-")
-                                if (p.size == 2) {
-                                    val s1 = p[0].trim().toIntOrNull() ?: 0
-                                    val s2 = p[1].trim().toIntOrNull() ?: 0
-                                    if (s1 > s2) p1S++ else if (s2 > s1) p2S++
+        // Serving indicator
+        if (isServing) {
+            Surface(color = AuraLime, shape = CircleShape, modifier = Modifier.size(22.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.SportsTennis, contentDescription = "Serving", tint = AuraDeep, modifier = Modifier.size(14.dp))
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+        } else {
+            Spacer(Modifier.width(28.dp))
+        }
+
+        // Player name + ranking
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                player.name.split(" ").last().uppercase(),
+                fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1
+            )
+            player.ranking?.let {
+                Text("#$it", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Medium)
+            }
+        }
+
+        // Score area: set scores then separator then game points
+        if (hasScore) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                sets.forEachIndexed { i, myScore ->
+                    val oppScore = opponentSets.getOrElse(i) { 0 }
+                    val complete = setsComplete.getOrElse(i) { false }
+                    val iWon = complete && myScore > oppScore
+                    val oppWon = complete && oppScore > myScore
+
+                    if (complete) {
+                        if (iWon) {
+                            Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        } else if (oppWon) {
+                            Surface(
+                                color = Color(0xFFCC2200),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.defaultMinSize(minWidth = 24.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)) {
+                                    Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
                                 }
                             }
-                            Text("$p1S : $p2S", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Black, color = AuraLime)
                         } else {
-                            Text("VS", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.3f))
+                            Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f))
                         }
+                    } else {
+                        Text(myScore.toString(), fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White)
                     }
+                }
 
-                    PlayerHeroAvatar(
-                        player = match.awayPlayer,
-                        isServing = match.isHomeServing == false,
-                        onClick = { onPlayerClick(match.awayPlayer.key, match.awayPlayer.name) }
+                // Separator + game points
+                if (gamePoints.isNotBlank()) {
+                    Text("|", fontSize = 17.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 4.dp))
+                    Text(gamePoints, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+
+            // Sets won count (bold, right-most)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                totalSetsWon.toString(),
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Black,
+                color = if (totalSetsWon > 0) Color.White else Color.White.copy(alpha = 0.2f)
+            )
+        } else {
+            // No score yet — VS
+            Text("VS", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.2f))
+        }
+    }
+}
+
+private fun parseSetScore(s: String): Int = when {
+    "(" in s -> s.substring(0, s.indexOf("(")).trim().toIntOrNull() ?: 0
+    "." in s -> s.substring(0, s.indexOf(".")).trim().toIntOrNull() ?: 0
+    else -> s.trim().toIntOrNull() ?: 0
+}
+
+private fun isSetComplete(s1: Int, s2: Int): Boolean {
+    if (s1 == 7 && s2 == 6) return true
+    if (s2 == 7 && s1 == 6) return true
+    if (s1 >= 6 && s1 - s2 >= 2) return true
+    if (s2 >= 6 && s2 - s1 >= 2) return true
+    return false
+}
+
+
+// ─── AI Prediction ───────────────────────────────────────────────────────────
+
+@Composable
+private fun AIPredictionSection(
+    prediction: MatchPrediction,
+    p1Name: String,
+    p2Name: String
+) {
+    SectionTitle("AI PREDICTION")
+
+    val p1Prob = prediction.player1WinProbability
+        .coerceIn(0f, 1f)
+        .let { it / (it + prediction.player2WinProbability.coerceIn(0f, 1f)).coerceAtLeast(0.001f) }
+    val p1Pct = (p1Prob * 100).toInt()
+    val p2Pct = 100 - p1Pct
+
+    val animatedP1 by animateFloatAsState(targetValue = p1Prob, animationSpec = tween(900), label = "ai_prob")
+
+    Spacer(Modifier.height(12.dp))
+
+    // Probability bar
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(32.dp).clip(RoundedCornerShape(8.dp))) {
+        val totalWidth = maxWidth
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.width(totalWidth * animatedP1).fillMaxHeight()
+                    .background(AuraPurple),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (animatedP1 > 0.15f) Text(
+                    "$p1Pct%",
+                    fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color.White,
+                    modifier = Modifier.padding(start = 10.dp)
+                )
+            }
+            Box(
+                modifier = Modifier.weight(1f).fillMaxHeight()
+                    .background(AuraDeep.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                if (1f - animatedP1 > 0.15f) Text(
+                    "$p2Pct%",
+                    fontSize = 13.sp, fontWeight = FontWeight.Black, color = AuraDeep.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(end = 10.dp)
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(4.dp))
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(p1Name.split(" ").last(), fontSize = 10.sp, color = AuraPurple, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(p2Name.split(" ").last(), fontSize = 10.sp, color = AuraDeep.copy(alpha = 0.5f), fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    // Confidence badge + explanation
+    val (confidenceLabel, confidenceColor, confidenceDesc) = when (prediction.confidence) {
+        PredictionConfidence.HIGH   -> Triple("HOHE KONFIDENZ",   AuraPurple, "Modell sehr sicher in seiner Prognose")
+        PredictionConfidence.MEDIUM -> Triple("MITTLERE KONFIDENZ", Color(0xFFF59E0B), "Modell mäßig sicher in seiner Prognose")
+        PredictionConfidence.LOW    -> Triple("NIEDRIGE KONFIDENZ", Color(0xFFEF4444), "Modell unsicher — Tipp mit Vorsicht")
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            modifier = Modifier
+                .background(confidenceColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(confidenceLabel, fontSize = 10.sp, fontWeight = FontWeight.Black, color = confidenceColor)
+        }
+        Text(confidenceDesc, fontSize = 10.sp, color = AuraDeep.copy(alpha = 0.5f))
+    }
+}
+
+// ─── Wettquoten ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun OddsSection(
+    odds: List<BookmakerOdds>,
+    p1: Player,
+    p2: Player
+) {
+    val p1Name = p1.name.split(" ").last().uppercase()
+    val p2Name = p2.name.split(" ").last().uppercase()
+
+    SectionTitle("WETTQUOTEN")
+
+    if (odds.isEmpty()) {
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Keine Quoten verfügbar",
+            fontSize = 12.sp,
+            color = AuraDeep.copy(alpha = 0.35f),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(4.dp))
+        return
+    }
+
+    Spacer(Modifier.height(14.dp))
+
+    // Column headers
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            p1Name,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = AuraPurple,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            "Anbieter",
+            fontSize = 10.sp,
+            color = AuraDeep.copy(alpha = 0.35f),
+            modifier = Modifier.width(80.dp),
+            textAlign = TextAlign.Center
+        )
+        Text(
+            p2Name,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = AuraDeep.copy(alpha = 0.6f),
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.End
+        )
+    }
+
+    Spacer(Modifier.height(10.dp))
+    HorizontalDivider(color = Color(0xFFEEEEEE))
+    Spacer(Modifier.height(10.dp))
+
+    odds.take(5).forEachIndexed { index, o ->
+        val p1Favored = o.homeOdds <= o.awayOdds
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // P1 quote
+            Surface(
+                color = if (p1Favored) AuraPurple.copy(alpha = 0.1f) else Color(0xFFF5F5F5),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    String.format("%.2f", o.homeOdds),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (p1Favored) AuraPurple else AuraDeep.copy(alpha = 0.4f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            // Bookmaker
+            Text(
+                o.bookmakerName.take(10),
+                fontSize = 9.sp,
+                color = AuraDeep.copy(alpha = 0.35f),
+                modifier = Modifier.width(80.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+
+            // P2 quote
+            Surface(
+                color = if (!p1Favored) AuraPurple.copy(alpha = 0.1f) else Color(0xFFF5F5F5),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    String.format("%.2f", o.awayOdds),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (!p1Favored) AuraPurple else AuraDeep.copy(alpha = 0.4f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+        }
+
+        if (index < odds.size - 1 && index < 4) {
+            Spacer(Modifier.height(6.dp))
+        }
+    }
+
+    // No-vig probability bar (average across all bookmakers)
+    val avgP1Raw = odds.map { 1.0 / it.homeOdds }.average()
+    val avgP2Raw = odds.map { 1.0 / it.awayOdds }.average()
+    val overround = avgP1Raw + avgP2Raw
+    val p1Prob = (avgP1Raw / overround).toFloat()
+    val p2Prob = (avgP2Raw / overround).toFloat()
+
+    Spacer(Modifier.height(16.dp))
+    HorizontalDivider(color = Color(0xFFEEEEEE))
+    Spacer(Modifier.height(12.dp))
+
+    Text(
+        "Bereinigte Gewinnwahrscheinlichkeit",
+        fontSize = 10.sp,
+        color = AuraDeep.copy(alpha = 0.4f),
+        fontWeight = FontWeight.Medium,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Center
+    )
+    Spacer(Modifier.height(8.dp))
+
+    // Probability bar
+    val animatedP1 by animateFloatAsState(targetValue = p1Prob, animationSpec = tween(800), label = "prob")
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(8.dp))) {
+        val totalWidth = maxWidth
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.width(totalWidth * animatedP1).fillMaxHeight()
+                    .background(AuraPurple),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (animatedP1 > 0.15f) Text(
+                    "${(p1Prob * 100).toInt()}%",
+                    fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Box(
+                modifier = Modifier.weight(1f).fillMaxHeight()
+                    .background(AuraDeep.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                if (p2Prob > 0.15f) Text(
+                    "${(p2Prob * 100).toInt()}%",
+                    fontSize = 11.sp, fontWeight = FontWeight.Black, color = AuraDeep.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(4.dp))
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(p1Name, fontSize = 10.sp, color = AuraPurple, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(p2Name, fontSize = 10.sp, color = AuraDeep.copy(alpha = 0.5f), fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+    }
+}
+
+// ─── Section Card wrapper ─────────────────────────────────────────────────────
+
+@Composable
+private fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp),
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, Color(0xFFEEEEEE))
+    ) {
+        Column(modifier = Modifier.padding(16.dp), content = content)
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Black,
+        color = AuraDeep,
+        letterSpacing = 0.5.sp
+    )
+}
+
+// ─── Aktuelle Form ────────────────────────────────────────────────────────────
+
+@Composable
+private fun FormSection(
+    p1: Player,
+    p2: Player,
+    p1Matches: List<TennisMatch>,
+    p2Matches: List<TennisMatch>
+) {
+    SectionTitle("AKTUELLE FORM")
+    Spacer(Modifier.height(12.dp))
+
+    val p1Form = p1Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p1.key }.reversed()
+    val p2Form = p2Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p2.key }.reversed()
+
+    if (p1Form.isEmpty() && p2Form.isEmpty()) {
+        Text(
+            "Keine Spiele in der Vergangenheit",
+            fontSize = 12.sp,
+            color = AuraDeep.copy(alpha = 0.35f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            textAlign = TextAlign.Center
+        )
+    } else {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // Y-axis labels
+            Column(
+                modifier = Modifier.width(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.End
+            ) {
+                Text("G", fontSize = 9.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(24.dp))
+                Text("V", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(6.dp))
+            FormGraph(form = p1Form, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(16.dp))
+            FormGraph(form = p2Form, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun FormGraph(form: List<Boolean>, modifier: Modifier = Modifier) {
+    if (form.isEmpty()) {
+        Box(modifier = modifier.height(56.dp))
+        return
+    }
+    val winColor = Color(0xFF4CAF50)
+    val lossColor = Color(0xFFFF9800)
+    val lineColor = Color(0xFFCCCCCC)
+    val dotRadius = 7.dp
+    val graphHeight = 56.dp
+
+    Canvas(modifier = modifier.height(graphHeight)) {
+        val n = form.size
+        val w = size.width
+        val h = size.height
+        val topY = dotRadius.toPx() + 2f
+        val botY = h - dotRadius.toPx() - 2f
+
+        fun xOf(i: Int) = if (n == 1) w / 2f else i * (w - dotRadius.toPx() * 2) / (n - 1) + dotRadius.toPx()
+        fun yOf(won: Boolean) = if (won) topY else botY
+
+        // Lines between dots
+        for (i in 0 until n - 1) {
+            drawLine(
+                color = lineColor,
+                start = Offset(xOf(i), yOf(form[i])),
+                end = Offset(xOf(i + 1), yOf(form[i + 1])),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+        // Dots
+        form.forEachIndexed { i, won ->
+            drawCircle(
+                color = if (won) winColor else lossColor,
+                radius = dotRadius.toPx(),
+                center = Offset(xOf(i), yOf(won))
+            )
+        }
+    }
+}
+
+// ─── Ranglisten ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun RankingSection(
+    p1: Player,
+    p2: Player,
+    p1Elo: PlayerEloProfile?,
+    p2Elo: PlayerEloProfile?
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("ATP", "ELO")
+
+    SectionTitle("RANGLISTEN")
+    Spacer(Modifier.height(12.dp))
+
+    // Slider toggle — same design as TimeRangeFilter
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        val itemWidth = maxWidth / tabs.size
+        val indicatorOffset by animateDpAsState(
+            targetValue = itemWidth * selectedTab,
+            animationSpec = spring(stiffness = Spring.StiffnessLow),
+            label = "rankTab"
+        )
+        Box(
+            modifier = Modifier
+                .offset(x = indicatorOffset)
+                .width(itemWidth)
+                .fillMaxHeight()
+                .padding(4.dp)
+                .background(AuraPurple, RoundedCornerShape(16.dp))
+        )
+        Row(modifier = Modifier.fillMaxSize()) {
+            tabs.forEachIndexed { i, label ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { selectedTab = i },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selectedTab == i) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.offset(y = (-1).dp)
                     )
                 }
             }
         }
     }
+
+    Spacer(Modifier.height(16.dp))
+
+    if (selectedTab == 0) {
+        RankingBarRow(
+            label = "Aktueller Rang",
+            v1 = p1.ranking?.let { "#$it" } ?: "—",
+            v2 = p2.ranking?.let { "#$it" } ?: "—",
+            // Lower rank number = better, so invert for bar
+            p1Better = (p1.ranking ?: Int.MAX_VALUE) < (p2.ranking ?: Int.MAX_VALUE),
+            ratio = rankingRatio(p1.ranking, p2.ranking, invert = true)
+        )
+        Spacer(Modifier.height(12.dp))
+        RankingBarRow(
+            label = "Ranking-Punkte",
+            v1 = p1.atpPoints?.let { formatPoints(it) } ?: "—",
+            v2 = p2.atpPoints?.let { formatPoints(it) } ?: "—",
+            p1Better = (p1.atpPoints ?: 0) >= (p2.atpPoints ?: 0),
+            ratio = simpleRatio(p1.atpPoints?.toDouble(), p2.atpPoints?.toDouble())
+        )
+        Spacer(Modifier.height(12.dp))
+        RankingBarRow(
+            label = "Karriere-Bestwert",
+            v1 = p1.careerHighRanking?.let { "#$it" } ?: "—",
+            v2 = p2.careerHighRanking?.let { "#$it" } ?: "—",
+            p1Better = (p1.careerHighRanking ?: Int.MAX_VALUE) < (p2.careerHighRanking ?: Int.MAX_VALUE),
+            ratio = rankingRatio(p1.careerHighRanking, p2.careerHighRanking, invert = true)
+        )
+        if (p1.prizeMoneyYtd != null || p2.prizeMoneyYtd != null) {
+            Spacer(Modifier.height(12.dp))
+            RankingBarRow(
+                label = "Preisgeld 2026",
+                v1 = p1.prizeMoneyYtd?.let { formatPrizeMoney(it) } ?: "—",
+                v2 = p2.prizeMoneyYtd?.let { formatPrizeMoney(it) } ?: "—",
+                p1Better = (p1.prizeMoneyYtd ?: 0) > (p2.prizeMoneyYtd ?: 0),
+                ratio = run {
+                    val a = (p1.prizeMoneyYtd ?: 0).toDouble()
+                    val b = (p2.prizeMoneyYtd ?: 0).toDouble()
+                    if (a + b == 0.0) 0.5f else (a / (a + b)).toFloat()
+                }
+            )
+        }
+    } else {
+        EloBarRow("Gesamt", p1Elo?.eloOverall, p2Elo?.eloOverall)
+        Spacer(Modifier.height(12.dp))
+        EloBarRow("Sand", p1Elo?.eloClay, p2Elo?.eloClay)
+        Spacer(Modifier.height(12.dp))
+        EloBarRow("Rasen", p1Elo?.eloGrass, p2Elo?.eloGrass)
+        Spacer(Modifier.height(12.dp))
+        EloBarRow("Hartplatz", p1Elo?.eloHard, p2Elo?.eloHard)
+    }
+}
+
+private fun simpleRatio(a: Double?, b: Double?): Float {
+    val total = (a ?: 0.0) + (b ?: 0.0)
+    return if (total == 0.0) 0.5f else ((a ?: 0.0) / total).toFloat()
+}
+
+private fun rankingRatio(r1: Int?, r2: Int?, invert: Boolean): Float {
+    if (r1 == null && r2 == null) return 0.5f
+    if (r1 == null) return if (invert) 0f else 1f
+    if (r2 == null) return if (invert) 1f else 0f
+    // For ranking: lower = better; so effective value = 1/rank
+    val e1 = 1.0 / r1
+    val e2 = 1.0 / r2
+    return simpleRatio(e1, e2)
+}
+
+private fun formatPoints(pts: Int): String = pts.toString()
+
+@Composable
+private fun EloBarRow(label: String, v1: Int?, v2: Int?) {
+    // Amplify the difference: ±400 ELO = full bar swing
+    val ratio = if (v1 != null && v2 != null) {
+        (0.5f + (v1 - v2) / 800f).coerceIn(0.05f, 0.95f)
+    } else 0.5f
+    RankingBarRow(
+        label = "ELO $label",
+        v1 = v1?.toString() ?: "—",
+        v2 = v2?.toString() ?: "—",
+        p1Better = (v1 ?: 0) >= (v2 ?: 0),
+        ratio = ratio
+    )
 }
 
 @Composable
-private fun PlayerHeroAvatar(player: Player, isServing: Boolean, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onClick() }) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            // Layered overlapping effect
+private fun RankingBarRow(
+    label: String,
+    v1: String,
+    v2: String,
+    p1Better: Boolean,
+    ratio: Float
+) {
+    val p1Color = AuraPurple
+    val p2Color = Color(0xFF9E9E9E)
+
+    val animRatio by animateFloatAsState(
+        targetValue = ratio.coerceIn(0.05f, 0.95f),
+        animationSpec = tween(600),
+        label = "barRatio"
+    )
+
+    Column {
+        // Values + label
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                v1,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Black,
+                color = if (p1Better) p1Color else AuraDeep.copy(alpha = 0.5f),
+                modifier = Modifier.width(52.dp)
+            )
+            Text(
+                label,
+                fontSize = 10.sp,
+                color = AuraDeep.copy(alpha = 0.4f),
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                v2,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Black,
+                color = if (!p1Better) p1Color else AuraDeep.copy(alpha = 0.5f),
+                modifier = Modifier.width(52.dp),
+                textAlign = TextAlign.End
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        // Bar
+        Row(
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+        ) {
             Box(
                 modifier = Modifier
-                    .size(94.dp)
-                    .offset(x = 4.dp, y = 4.dp)
-                    .clip(CircleShape)
-                    .background(AuraLime.copy(alpha = 0.2f))
+                    .weight(animRatio)
+                    .fillMaxHeight()
+                    .background(p1Color)
             )
-            Surface(
-                modifier = Modifier.size(84.dp), 
-                shape = CircleShape, 
-                color = Color.White.copy(alpha = 0.1f), 
-                border = BorderStroke(2.dp, Color.White.copy(alpha = 0.5f))
-            ) {
-                AsyncImage(model = player.logoUrl, contentDescription = player.name, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
-            }
-            if (isServing) {
-                Surface(color = AuraLime, shape = CircleShape, modifier = Modifier.size(24.dp).border(2.dp, AuraDeep, CircleShape)) {
-                    Box(contentAlignment = Alignment.Center) { Text("🎾", fontSize = 10.sp) }
-                }
-            }
+            Box(
+                modifier = Modifier
+                    .weight(1f - animRatio)
+                    .fillMaxHeight()
+                    .background(p2Color.copy(alpha = 0.3f))
+            )
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(player.name.split(" ").last().uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = Color.White)
     }
 }
 
 @Composable
-private fun ErrorView(message: String, onBack: () -> Unit, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(message, textAlign = TextAlign.Center)
-            Button(onClick = onRetry) { Text("Retry") }
-            TextButton(onClick = onBack) { Text("Back") }
+private fun ProfilLine(label: String, value: String) {
+    Column {
+        Text(label, fontSize = 9.sp, color = AuraDeep.copy(alpha = 0.4f))
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = AuraDeep)
+    }
+}
+
+@Composable
+private fun ProfilHeader(player: Player, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!player.logoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = player.logoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(28.dp).clip(CircleShape)
+            )
+        } else {
+            Box(
+                modifier = Modifier.size(28.dp).clip(CircleShape).background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(player.name.take(1), fontSize = 12.sp, fontWeight = FontWeight.Black, color = color)
+            }
+        }
+        Text(
+            player.name.split(" ").last(),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Black,
+            color = color,
+            maxLines = 1
+        )
+    }
+}
+
+// ─── Preisgeld ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun formatPrizeMoney(usd: Int): String {
+    return when {
+        usd >= 1_000_000 -> "$%.2fM".format(usd / 1_000_000.0).trimEnd('0').trimEnd('.')
+        usd >= 1_000 -> "$%.0fk".format(usd / 1_000.0)
+        else -> "$$usd"
+    }
+}
+
+@Composable
+private fun PreisgeldSection(p1: Player, p2: Player) {
+    SectionTitle("PREISGELD 2026")
+    Spacer(Modifier.height(16.dp))
+
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ProfilHeader(player = p1, color = AuraPurple)
+            ProfilLine("Diese Saison", p1.prizeMoneyYtd?.let { formatPrizeMoney(it) } ?: "—")
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ProfilHeader(player = p2, color = AuraDeep)
+            ProfilLine("Diese Saison", p2.prizeMoneyYtd?.let { formatPrizeMoney(it) } ?: "—")
         }
     }
 }

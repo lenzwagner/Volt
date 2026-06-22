@@ -44,9 +44,6 @@ interface EloDao {
     @Query("SELECT * FROM elo_ratings WHERE LOWER(playerName) LIKE LOWER('%' || :lastName || '%') ORDER BY matchesPlayed DESC LIMIT 1")
     suspend fun getEloByLastName(lastName: String): EloRatingEntity?
 
-    @Query("SELECT * FROM elo_ratings")
-    suspend fun getAllElo(): List<EloRatingEntity>
-
     @Query("DELETE FROM elo_ratings")
     suspend fun clearAll()
 

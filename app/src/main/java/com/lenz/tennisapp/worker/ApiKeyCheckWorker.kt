@@ -40,9 +40,9 @@ class ApiKeyCheckWorker @AssistedInject constructor(
 
         try {
             val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-            val response = tennisApi.getFixtures(dateStart = today, dateStop = today, apiKey = key)
-            if (response.success == 0) {
-                val error = response.error ?: ""
+            val response = tennisApi.getFixtures(eventType = 1, dateStart = today, dateStop = today, apiKey = key)
+            if (response.success?.toString() == "0") {
+                val error = response.error?.toString() ?: ""
                 val isKeyError = error.contains("key", ignoreCase = true) ||
                         error.contains("limit", ignoreCase = true) ||
                         error.contains("expired", ignoreCase = true)

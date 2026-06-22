@@ -1,11 +1,9 @@
 package com.lenz.tennisapp.data.scraper
 
-import com.lenz.tennisapp.data.api.RankingProxyService
-import com.lenz.tennisapp.data.db.dao.RankingDao
-import com.lenz.tennisapp.data.db.entities.RankingEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jsoup.Jsoup
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Singleton
 
 data class PlayerRankingInfo(
     val playerName: String,
@@ -15,61 +13,118 @@ data class PlayerRankingInfo(
 
 data class PlayerPrizeMoney(
     val playerName: String,
-    val prizeMoneyCurrentYear: Long
+    val prizeMoneyCurrentYear: Long  // in Euro
 )
 
-@Singleton
-class LiveTennisScraper @Inject constructor(
-    private val proxyService: RankingProxyService,
-    private val rankingDao: RankingDao
-) {
-    companion object {
-        private const val TAG = "LiveTennisScraper"
-    }
+object LiveTennisScraper {
 
-    /** Fetches ATP + WTA rankings from the Render proxy and saves them to DB. */
-    suspend fun scrapeAndSave(): Boolean {
-        var atpSaved = 0
-        var wtaSaved = 0
+    suspend fun getATPRanking(playerName: String): PlayerRankingInfo? = withContext(Dispatchers.IO) {
         try {
-            atpSaved = fetchAndStore("ATP")
-            wtaSaved = fetchAndStore("WTA")
+            val url = "https://live-tennis.eu/en/atp-live-ranking"
+            val doc = Jsoup.connect(url).timeout(10000).get()
+
+            val rows = doc.select("table tbody tr")
+            rows.forEach { row ->
+                val cells = row.select("td")
+                if (cells.size >= 5) { // Increased minimum cells
+                    val name = cells[1].text().trim()
+                    if (name.contains(playerName, ignoreCase = true)) {
+                        val ranking = cells[0].text().trim().toIntOrNull() ?: return@forEach
+                        // Points are usually in the 4th or 5th column
+                        val points = cells.drop(3).mapNotNull { 
+                            it.text().trim().replace(".", "").replace(",", "").toIntOrNull() 
+                        }.firstOrNull() ?: 0
+                        return@withContext PlayerRankingInfo(name, ranking, points)
+                    }
+                }
+            }
+            null
         } catch (e: Exception) {
-            Timber.e(e, "LiveTennisScraper failed")
+            Timber.e(e, "Error scraping ATP ranking for $playerName")
+            null
         }
-        Timber.i("Saved $atpSaved ATP + $wtaSaved WTA ranking entries from proxy")
-        return (atpSaved + wtaSaved) > 0
     }
 
-    private suspend fun fetchAndStore(tour: String): Int {
-        return try {
-            val response = if (tour == "ATP") proxyService.getAtpRankings()
-                          else proxyService.getWtaRankings()
+    suspend fun getWTARanking(playerName: String): PlayerRankingInfo? = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://live-tennis.eu/en/wta-live-ranking"
+            val doc = Jsoup.connect(url).timeout(10000).get()
 
-            if (!response.success || response.data.isNullOrEmpty()) {
-                Timber.w("Proxy returned no $tour data")
-                return 0
+            val rows = doc.select("table tbody tr")
+            rows.forEach { row ->
+                val cells = row.select("td")
+                if (cells.size >= 5) { // Increased minimum cells
+                    val name = cells[1].text().trim()
+                    if (name.contains(playerName, ignoreCase = true)) {
+                        val ranking = cells[0].text().trim().toIntOrNull() ?: return@forEach
+                        // Points are usually in the 4th or 5th column
+                        val points = cells.drop(3).mapNotNull { 
+                            it.text().trim().replace(".", "").replace(",", "").toIntOrNull() 
+                        }.firstOrNull() ?: 0
+                        return@withContext PlayerRankingInfo(name, ranking, points)
+                    }
+                }
             }
-
-            val entities = response.data.map { p ->
-                val key = "lt_${p.name.lowercase().replace(Regex("[^a-z0-9]"), "_")}"
-                RankingEntity(
-                    playerKey   = key,
-                    playerName  = p.name,
-                    tour        = tour,
-                    ranking     = p.rank,
-                    points      = p.points,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            }
-
-            rankingDao.clearTour(tour)
-            rankingDao.upsertAll(entities)
-            Timber.d("Stored ${entities.size} $tour rankings")
-            entities.size
+            null
         } catch (e: Exception) {
-            Timber.e(e, "Failed to fetch $tour rankings from proxy")
-            0
+            Timber.e(e, "Error scraping WTA ranking for $playerName")
+            null
+        }
+    }
+
+    suspend fun getATPPrizeMoney(playerName: String): PlayerPrizeMoney? = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://live-tennis.eu/de/atp-preisgeld-des-laufenden-jahres"
+            val doc = Jsoup.connect(url).timeout(10000).get()
+
+            val rows = doc.select("table tbody tr")
+            rows.forEach { row ->
+                val cells = row.select("td")
+                if (cells.size >= 3) {
+                    val name = cells[1].text().trim()
+                    if (name.contains(playerName, ignoreCase = true)) {
+                        val moneyStr = cells[2].text().trim()
+                            .replace("€", "")
+                            .replace(".", "")
+                            .replace(",", "")
+                            .trim()
+                        val money = moneyStr.toLongOrNull() ?: 0L
+                        return@withContext PlayerPrizeMoney(name, money)
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Timber.e(e, "Error scraping ATP prize money for $playerName")
+            null
+        }
+    }
+
+    suspend fun getWTAPrizeMoney(playerName: String): PlayerPrizeMoney? = withContext(Dispatchers.IO) {
+        try {
+            val url = "https://live-tennis.eu/de/wta-preisgeld-des-laufenden-jahres"
+            val doc = Jsoup.connect(url).timeout(10000).get()
+
+            val rows = doc.select("table tbody tr")
+            rows.forEach { row ->
+                val cells = row.select("td")
+                if (cells.size >= 3) {
+                    val name = cells[1].text().trim()
+                    if (name.contains(playerName, ignoreCase = true)) {
+                        val moneyStr = cells[2].text().trim()
+                            .replace("€", "")
+                            .replace(".", "")
+                            .replace(",", "")
+                            .trim()
+                        val money = moneyStr.toLongOrNull() ?: 0L
+                        return@withContext PlayerPrizeMoney(name, money)
+                    }
+                }
+            }
+            null
+        } catch (e: Exception) {
+            Timber.e(e, "Error scraping WTA prize money for $playerName")
+            null
         }
     }
 }

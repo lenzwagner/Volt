@@ -3,10 +3,15 @@ package com.lenz.tennisapp
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
+import com.lenz.tennisapp.data.datastore.ApiKeyStore
 import com.lenz.tennisapp.notification.NotificationHelper
 import com.lenz.tennisapp.ui.theme.CourtType
 import com.lenz.tennisapp.worker.*
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import java.util.Calendar
@@ -29,6 +34,7 @@ class TennisApplication : Application(), Configuration.Provider {
     }
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var apiKeyStore: ApiKeyStore
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -47,9 +53,16 @@ class TennisApplication : Application(), Configuration.Provider {
         scheduleApiKeyCheck()
         scheduleEloSync()
         scheduleRankingsAndEloSync()
-        scheduleDailyMatchSync()
         scheduleDatabaseCleanup()
         scheduleMatchNotifications()
+        // Cancel any previously scheduled bulk odds sync — odds are fetched on-demand only
+        WorkManager.getInstance(this).cancelUniqueWork(com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME)
+
+        // Always reset expired flag on startup — the interceptor re-sets it if the key is truly dead
+        CoroutineScope(Dispatchers.IO).launch {
+            apiKeyStore.setOddsKeyExpired(false)
+        }
+        // Odds are fetched on-demand when user opens a match (max 1 call/match/day)
     }
 
     private fun setupCrashHandler() {
@@ -167,36 +180,6 @@ class TennisApplication : Application(), Configuration.Provider {
         )
     }
 
-    private fun scheduleDailyMatchSync() {
-        // Initial run at 5:00 AM (warm DB before user opens app)
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 5)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-        }
-        if (target.before(now)) target.add(Calendar.DAY_OF_MONTH, 1)
-        val initialDelay = target.timeInMillis - now.timeInMillis
-
-        // Repeat every 4 hours to catch cancellations and schedule changes
-        val request = PeriodicWorkRequestBuilder<DailyMatchSyncWorker>(4, TimeUnit.HOURS)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            DailyMatchSyncWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
-        Timber.d("DailyMatchSyncWorker scheduled at 5:00 AM, then every 4h")
-    }
-
     private fun scheduleDatabaseCleanup() {
         // Berechne Verzögerung bis 4:00 Uhr (nach Rankings-Sync)
         val now = Calendar.getInstance()
@@ -233,5 +216,34 @@ class TennisApplication : Application(), Configuration.Provider {
         )
 
         Timber.d("Database cleanup scheduled to run daily at 4:00 AM (90-day rotation)")
+    }
+
+    private fun scheduleOddsSync() {
+        // Run at 7:00 AM every day
+        val now = Calendar.getInstance()
+        val target = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 7)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (target.before(now)) target.add(Calendar.DAY_OF_MONTH, 1)
+        val initialDelay = target.timeInMillis - now.timeInMillis
+
+        val request = PeriodicWorkRequestBuilder<OddsSyncWorker>(1, TimeUnit.DAYS)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            OddsSyncWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+        Timber.d("Odds sync scheduled daily at 7:00 AM")
     }
 }

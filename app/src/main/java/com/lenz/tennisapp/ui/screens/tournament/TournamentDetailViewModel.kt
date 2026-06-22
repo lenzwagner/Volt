@@ -135,6 +135,12 @@ class TournamentDetailViewModel @Inject constructor(
             TournamentCategory.WTA_500         -> "500"
             TournamentCategory.ATP_250, 
             TournamentCategory.WTA_250         -> "250"
+            TournamentCategory.WTA_125         -> "125"
+            TournamentCategory.CHALLENGER_175  -> "175"
+            TournamentCategory.CHALLENGER_125  -> "125"
+            TournamentCategory.CHALLENGER_100  -> "100"
+            TournamentCategory.CHALLENGER_75   -> "75"
+            TournamentCategory.CHALLENGER_50   -> "50"
             TournamentCategory.CHALLENGER      -> "125"
             else                               -> "—"
         }

@@ -61,8 +61,10 @@ fun SetScoreGrid(
     val inTiebreak = isLive && parseGames(lastSet?.first ?: "") == 6 && parseGames(lastSet?.second ?: "") == 6
 
     val gParts = gameScore?.split("-")
-    val gHome  = gParts?.getOrNull(0)?.trim()
-    val gAway  = gParts?.getOrNull(1)?.trim()
+    val gHome  = gParts?.getOrNull(0)?.trim()?.ifBlank { "0" }
+    val gAway  = gParts?.getOrNull(1)?.trim()?.ifBlank { "0" }
+    // When live but no game score yet, show "0" for both so rows stay same width
+    val showGame = isLive && gameScore != null
 
     Column(
         modifier = modifier,
@@ -86,13 +88,14 @@ fun SetScoreGrid(
                     fontSize  = fontSize
                 )
             }
-            if (isLive && !gHome.isNullOrBlank()) {
+            if (showGame) {
                 Text(
-                    text = gHome,
+                    text = gHome ?: "0",
                     fontSize = gameSize,
-                    color = Color.Red,
+                    color = AuraPurple,
                     fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(start = 4.dp)
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.padding(start = 2.dp).width(28.dp)
                 )
             }
         }
@@ -117,13 +120,14 @@ fun SetScoreGrid(
                     fontSize  = fontSize
                 )
             }
-            if (isLive && !gAway.isNullOrBlank()) {
+            if (showGame) {
                 Text(
-                    text = gAway,
+                    text = gAway ?: "0",
                     fontSize = gameSize,
-                    color = Color.Red,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.padding(start = 4.dp)
+                    color = AuraDeep.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.padding(start = 2.dp).width(28.dp)
                 )
             }
         }
@@ -147,6 +151,7 @@ private fun SetDigit(
         "." in value -> value.substring(value.indexOf(".") + 1)
         else -> null
     }
+    val hasDot = "." in value
 
     val scale by animateFloatAsState(
         targetValue = if (isWinner) 1.2f else 1.0f,
@@ -171,7 +176,7 @@ private fun SetDigit(
         horizontalArrangement = Arrangement.Center
     ) {
         Text(
-            text      = games,
+            text      = if (hasDot) "$games." else games,
             fontSize  = fontSize,
             fontWeight = weight,
             color     = color,
@@ -180,10 +185,9 @@ private fun SetDigit(
         if (tbPoints != null && !isCurrent) {
             Text(
                 text = tbPoints,
-                fontSize = fontSize * 0.65f,
+                fontSize = fontSize * 0.6f, // Slightly smaller
                 fontWeight = FontWeight.Bold,
-                color = color.copy(alpha = 0.5f),
-                modifier = Modifier.padding(top = 1.dp)
+                color = color.copy(alpha = 0.7f)
             )
         }
     }

@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SportsTennis
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,6 +101,12 @@ fun PlayerAvatarWithRanking(
         }
 
         player.ranking?.let { rank ->
+            val digits = rank.toString().length
+            val actualFontSize = when {
+                digits >= 3 -> rankingFontSize * 0.72f
+                digits == 2 -> rankingFontSize * 0.85f
+                else -> rankingFontSize
+            }
             Surface(
                 modifier = Modifier
                     .size(badgeSize)
@@ -112,7 +120,7 @@ fun PlayerAvatarWithRanking(
                         rank.toString(),
                         style = androidx.compose.ui.text.TextStyle(
                             color = AuraLime,
-                            fontSize = rankingFontSize,
+                            fontSize = actualFontSize,
                             fontWeight = FontWeight.Black,
                             textAlign = TextAlign.Center
                         )
@@ -350,12 +358,43 @@ private fun PlayerMatchRow(player: Player, isWinner: Boolean, isServing: Boolean
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        PlayerAvatarWithRanking(
-            player = player,
-            size = 36.dp,
-            rankingFontSize = 7.sp,
-            badgeSize = 14.dp
-        )
+        Box(contentAlignment = Alignment.BottomCenter) {
+            PlayerAvatarWithRanking(
+                player = player,
+                size = 36.dp,
+                rankingFontSize = 7.sp,
+                badgeSize = 14.dp
+            )
+            
+            // Small badge at the bottom of avatar
+            Surface(
+                color = AuraLime,
+                shape = CircleShape,
+                modifier = Modifier.size(12.dp).offset(y = 4.dp),
+                border = BorderStroke(1.dp, AuraDeep)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("-", color = AuraDeep, fontSize = 8.sp, fontWeight = FontWeight.Black, modifier = Modifier.offset(y = (-1).dp))
+                }
+            }
+        }
+
+        if (isServing) {
+            Surface(
+                color = AuraLime,
+                shape = CircleShape,
+                modifier = Modifier.size(22.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.SportsTennis,
+                        contentDescription = "Serving",
+                        tint = AuraDeep,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
 
         Text(
             text = player.name.uppercase(),
@@ -369,14 +408,6 @@ private fun PlayerMatchRow(player: Player, isWinner: Boolean, isServing: Boolean
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-
-        if (isServing) {
-            Surface(
-                color = AuraLime,
-                shape = CircleShape,
-                modifier = Modifier.size(10.dp).border(1.dp, AuraDeep.copy(alpha = 0.2f), CircleShape)
-            ) {}
-        }
     }
 }
 
@@ -411,35 +442,62 @@ private fun StatusBadge(text: String, textColor: Color, bgColor: Color) {
 @Composable
 private fun LiveIndicator() {
     val infiniteTransition = rememberInfiniteTransition(label = "live_pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f, targetValue = 1.15f,
+    
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.12f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "live_scale"
+        label = "pulse"
     )
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = Color.Red,
-        modifier = Modifier.scale(scale)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
+    Box(contentAlignment = Alignment.Center) {
+        // Expressive glow background
+        Box(
+            modifier = Modifier
+                .scale(pulseScale * 1.4f)
+                .size(width = 40.dp, height = 18.dp)
+                .background(Color.Red.copy(alpha = glowAlpha * 0.2f), RoundedCornerShape(8.dp))
+        )
+        
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color.Red,
+            modifier = Modifier.scale(pulseScale),
+            shadowElevation = 4.dp
         ) {
-            Surface(
-                color = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(6.dp)
-            ) {}
-            Spacer(Modifier.width(4.dp))
-            Text(
-                "LIVE",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                color = Color.White,
-                fontWeight = FontWeight.Black,
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(Color.White, CircleShape)
+                )
+                Text(
+                    "LIVE",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = Color.White,
+                    fontWeight = FontWeight.Black
+                )
+            }
         }
     }
 }

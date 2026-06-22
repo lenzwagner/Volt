@@ -21,30 +21,26 @@ data class MatchEntity(
     val round: String?,
     val surface: String?,                // Surface enum name
     val tournamentCategory: String,      // TournamentCategory enum name
+    val eventType: String = "",          // "Atp Singles" etc.
     val winnerId: String?,               // homePlayerKey or awayPlayerKey when finished
     val statsJson: String?,              // serialized List<MatchStatDto> for detail screen
     val firstPlayerLogo: String?,
     val secondPlayerLogo: String?,
     val serve: String? = null,           // "First Player" | "Second Player" during live
-    val cachedAt: Long = System.currentTimeMillis()
+    val cachedAt: Long = System.currentTimeMillis(),
+    val oddsJson: String? = null,        // serialized List<BookmakerOdds> cached once per day
+    val oddsSyncedAt: Long? = null       // epoch ms when odds were last fetched
 )
 
 @Entity(tableName = "elo_ratings")
 data class EloRatingEntity(
     @PrimaryKey val playerKey: String,
     val playerName: String,
-    val eloOverall: Double? = null,
-    val eloClay: Double? = null,
-    val eloGrass: Double? = null,
-    val eloHard: Double? = null,
-    val eloIndoor: Double? = null,
-    // Elo ranking positions (e.g. #3 overall, #4 on grass)
-    val rankOverall: Int? = null,
-    val rankHard: Int? = null,
-    val rankClay: Int? = null,
-    val rankGrass: Int? = null,
-    val peakElo: Double? = null,
-    val peakEloDate: String? = null,
+    val eloOverall: Double = 1500.0,
+    val eloClay: Double = 1500.0,
+    val eloGrass: Double = 1500.0,
+    val eloHard: Double = 1500.0,
+    val eloIndoor: Double = 1500.0,
     val matchesPlayed: Int = 0,
     val updatedAt: Long = System.currentTimeMillis()
 )

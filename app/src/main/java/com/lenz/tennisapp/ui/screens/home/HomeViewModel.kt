@@ -2,326 +2,229 @@ package com.lenz.tennisapp.ui.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lenz.tennisapp.data.datastore.ApiKeyStore
-import com.lenz.tennisapp.data.db.dao.RankingDao
-import com.lenz.tennisapp.data.repository.PredictionRepository
+import com.lenz.tennisapp.data.repository.PlayerRepository
 import com.lenz.tennisapp.data.repository.TennisRepository
 import com.lenz.tennisapp.domain.model.*
-import com.lenz.tennisapp.domain.prediction.MatchPredictor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.update
-import java.time.LocalDate
+import timber.log.Timber
 import javax.inject.Inject
 
 data class HomeUiState(
-    val tournaments: List<Tournament> = emptyList(),
-    val predictions: Map<String, UserPrediction> = emptyMap(),
+    val tournaments: List<Tournament>? = null,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
-    val isKeyExpired: Boolean = false,
-    val selectedDate: LocalDate = LocalDate.now(),
-    val liveFilter: LiveFilterState = LiveFilterState(),
-    val tipsOfTheDay: List<TipOfTheDay> = emptyList(),
-    val tipsDismissed: Boolean = false,
-    val tipThreshold: Float = 0.75f,
-    val tipCount: Int = 5,
-    val hasAnyTips: Boolean = false
-)
-
-data class TipOfTheDay(
-    val match: TennisMatch,
-    val aiProbHome: Float,  // 0.0 to 1.0
-    val confidence: Float = maxOf(aiProbHome, 1f - aiProbHome)  // Always >0.5, only >0.75 shown
+    val networkFetchDone: Boolean = false
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: TennisRepository,
-    private val predictionRepository: PredictionRepository,
-    private val keyStore: ApiKeyStore,
-    private val predictor: MatchPredictor,
-    private val rankingDao: RankingDao
+    private val playerRepository: PlayerRepository
 ) : ViewModel() {
 
-    private val _selectedDate  = MutableStateFlow(LocalDate.now())
-    private val _isLoading     = MutableStateFlow(false)
-    private val _error         = MutableStateFlow<String?>(null)
-    private val _isKeyExpired  = MutableStateFlow(false)
-    private val _liveFilter    = MutableStateFlow(LiveFilterState())
-    private val _tipDismissed  = MutableStateFlow(false)
-    private val _tipsOfTheDay  = MutableStateFlow<List<TipOfTheDay>>(emptyList())
-    private val _tipThreshold  = MutableStateFlow(0.75f)
-    private val _tipCount      = MutableStateFlow(5)
-    private val _liveOnly      = MutableStateFlow(false)
+    private val _tourFilter = MutableStateFlow(TourFilter.ALL)
+    private val _formatFilter = MutableStateFlow(FormatFilter.ALL)
+    private val _categoryFilter = MutableStateFlow(CategoryFilter.ALL)
+    private val _liveFilter = MutableStateFlow(false)
+    private val _finishedFilter = MutableStateFlow(false)
 
-    val liveOnly: StateFlow<Boolean> = _liveOnly
+    val tourFilter: StateFlow<TourFilter> = _tourFilter.asStateFlow()
+    val formatFilter: StateFlow<FormatFilter> = _formatFilter.asStateFlow()
+    val categoryFilter: StateFlow<CategoryFilter> = _categoryFilter.asStateFlow()
+    val liveFilter: StateFlow<Boolean> = _liveFilter.asStateFlow()
+    val finishedFilter: StateFlow<Boolean> = _finishedFilter.asStateFlow()
 
-    val liveMatchCount: StateFlow<Int> = repository.getLiveMatches()
-        .map { it.size }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    private val _rawToday = MutableStateFlow<List<Tournament>?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
+    private val _lastError = MutableStateFlow<String?>(null)
+    private val _networkFetchDone = MutableStateFlow(false)
 
-    fun toggleLiveOnly() { _liveOnly.value = !_liveOnly.value }
+    val liveCount: StateFlow<Int> = _rawToday.map { tournaments ->
+        tournaments?.sumOf { t -> t.matches.count { it.status == MatchStatus.LIVE } } ?: 0
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    private val _allRankings = rankingDao.getAllRankings()
-        .map { list -> 
-            // Create a map where key is a normalized version of the name
-            list.associateBy({ it.playerName.lowercase().trim() }, { it.ranking }) 
-        }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val isDataReady: StateFlow<Boolean> = _rawToday
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    // Live-specific state using getLiveMatches() (all matches with isLive=1, date-independent)
-    val liveUiState: StateFlow<HomeUiState> = combine(
-        repository.getLiveMatches().map { matches ->
-            matches.map { match ->
-                val leagueId = match.leagueId
-                Tournament(
-                    id = leagueId,
-                    name = match.tournament,
-                    category = match.tournamentCategory,
-                    surface = match.surface,
-                    matches = listOf(match)
-                )
-            }.groupBy { it.id }.map { (_, ts) ->
-                ts.first().copy(matches = ts.flatMap { it.matches })
-            }
-        },
-        predictionRepository.getPredictionMap(),
-        _isLoading,
-        _error,
-        _isKeyExpired,
+    val todayUiState: StateFlow<HomeUiState> = combine(
+        _rawToday,
+        _tourFilter,
+        _formatFilter,
+        _categoryFilter,
         _liveFilter,
-        keyStore.tennisKeyExpired
+        _finishedFilter,
+        _isRefreshing,
+        _lastError,
+        _networkFetchDone
     ) { args ->
-        val tournaments = args[0] as List<Tournament>
-        val preds       = args[1] as Map<String, UserPrediction>
-        val loading     = args[2] as Boolean
-        val error       = args[3] as? String
-        val keyLocal    = args[4] as Boolean
-        val filter      = args[5] as LiveFilterState
-        val keyExpired  = args[6] as Boolean
+        val tournaments = args[0] as List<Tournament>?
+        val tour = args[1] as TourFilter
+        val format = args[2] as FormatFilter
+        val category = args[3] as CategoryFilter
+        val liveOnly = args[4] as Boolean
+        val finishedOnly = args[5] as Boolean
+        val refreshing = args[6] as Boolean
+        val lastErr = args[7] as String?
+        val networkDone = args[8] as Boolean
 
-        HomeUiState(
-            tournaments  = tournaments,
-            predictions  = preds,
-            isLoading    = loading,
-            error        = error,
-            isKeyExpired = keyLocal || keyExpired,
-            selectedDate = LocalDate.now(),
-            liveFilter   = filter
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+        if (tournaments == null && !refreshing) {
+            HomeUiState(isLoading = true, error = lastErr, networkFetchDone = networkDone)
+        } else {
+            var filtered = filterTournaments(tournaments ?: emptyList(), tour, format, category)
 
-    val uiState: StateFlow<HomeUiState> = combine(
-        _selectedDate.flatMapLatest { date -> repository.getMatchesForDate(date) },
-        predictionRepository.getPredictionMap(),
-        _isLoading,
-        _error,
-        _isKeyExpired,
-        _liveFilter,
-        _tipDismissed,
-        _tipsOfTheDay,
-        _allRankings,
-        keyStore.tennisKeyExpired,
-        _tipThreshold,
-        _tipCount
-    ) { args ->
-        val tournaments  = args[0] as List<Tournament>
-        val preds        = args[1] as Map<String, UserPrediction>
-        val loading      = args[2] as Boolean
-        val error        = args[3] as? String
-        val keyLocal     = args[4] as Boolean
-        val filter       = args[5] as LiveFilterState
-        val tipDismissed = args[6] as Boolean
-        val tips         = args[7] as List<TipOfTheDay>
-        val rankings     = args[8] as Map<String, Int>
-        val keyExpired   = args[9] as Boolean
-        val threshold    = args[10] as Float
-        val count        = args[11] as Int
-        val date         = _selectedDate.value
-
-        // Helper to find ranking by name - aggressive fuzzy matching
-        fun getRank(name: String): Int? {
-            val normalized = name.lowercase().trim()
-                .replace(".", "")
-                .replace("-", " ")
-            
-            val nameParts = normalized.split(" ").filter { it.length > 0 } // Allow single chars
-            if (nameParts.isEmpty()) return null
-            
-            val lastName = nameParts.last()
-            
-            // 1. Try exact match on normalized name
-            rankings[normalized]?.let { return it }
-            
-            // 2. Try matching by last name + any other part (initial or first name)
-            rankings.entries.find { (rankName, _) ->
-                val rName = rankName.lowercase().replace("-", " ")
-                rName.contains(lastName) && nameParts.any { part -> 
-                    part != lastName && rName.contains(part) 
-                }
-            }?.value?.let { return it }
-
-            // 3. Last name only fallback (if name is unique enough)
-            if (lastName.length > 3) {
-                val matches = rankings.entries.filter { it.key.lowercase().contains(lastName) }
-                if (matches.size == 1) return matches[0].value
+            if (liveOnly) {
+                filtered = filtered.map { t ->
+                    t.copy(matches = t.matches.filter { it.status == MatchStatus.LIVE })
+                }.filter { it.matches.isNotEmpty() }
             }
 
-            return null
-        }
+            if (finishedOnly) {
+                filtered = filtered.map { t ->
+                    t.copy(matches = t.matches.filter { it.status == MatchStatus.FINISHED })
+                }.filter { it.matches.isNotEmpty() }
+            }
 
-        // Enrich tournaments with rankings
-        val enrichedTournaments = tournaments.map { t ->
-            t.copy(matches = t.matches.map { m ->
-                m.copy(
-                    homePlayer = m.homePlayer.copy(ranking = getRank(m.homePlayer.name) ?: m.homePlayer.ranking),
-                    awayPlayer = m.awayPlayer.copy(ranking = getRank(m.awayPlayer.name) ?: m.awayPlayer.ranking)
+            if (filtered.isNotEmpty() || networkDone) {
+                HomeUiState(
+                    tournaments = sortedForToday(filtered),
+                    isRefreshing = refreshing,
+                    error = lastErr,
+                    networkFetchDone = networkDone
                 )
-            })
+            } else {
+                HomeUiState(isLoading = true, error = lastErr, networkFetchDone = networkDone)
+            }
         }
-
-        HomeUiState(
-            tournaments  = enrichedTournaments,
-            predictions  = preds,
-            isLoading    = loading,
-            error        = error,
-            isKeyExpired = keyLocal || keyExpired,
-            selectedDate = date,
-            liveFilter   = filter,
-            tipsOfTheDay = if (tipDismissed) emptyList() else tips.filter { it.confidence >= threshold }.take(count),
-            tipsDismissed = tipDismissed,
-            tipThreshold = threshold,
-            tipCount = count,
-            hasAnyTips = tips.isNotEmpty()
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState(isLoading = true))
 
     init {
-        viewModelScope.launch {
-            keyStore.setTennisKeyExpired(false)
-        }
         refresh()
         startPolling()
-        
-        // Update tips when tournaments change
+        startPrefetch()
+    }
+
+    // After the main page has data, warm match-detail caches (H2H + AI predictions,
+    // no odds API) in the background so opening a match is instant.
+    private fun startPrefetch() {
         viewModelScope.launch {
-            _selectedDate.flatMapLatest { date -> repository.getMatchesForDate(date) }
-                .collect { tournaments ->
-                    updateTips(tournaments)
+            val tournaments = _rawToday.filterNotNull().first()
+            // Order by likelihood of being tapped: live → upcoming → finished
+            val ids = tournaments
+                .flatMap { it.matches }
+                .sortedBy { m ->
+                    when (m.status) {
+                        MatchStatus.LIVE -> 0
+                        MatchStatus.NOT_STARTED, MatchStatus.TBD -> 1
+                        else -> 2
+                    }
                 }
+                .map { it.id }
+            if (ids.isNotEmpty()) {
+                try {
+                    repository.prefetchMatchDetails(ids)
+                } catch (e: Exception) {
+                    Timber.w(e, "Prefetch batch failed")
+                }
+            }
         }
     }
 
-    /** Polls livescores every 5 seconds while the app is in the foreground. */
     private fun startPolling() {
         viewModelScope.launch {
             while (true) {
-                delay(5_000L)
-                repository.refreshLivescores()
+                delay(10_000)
+                try {
+                    val result = repository.fetchOnce()
+                    _rawToday.value = result
+                } catch (e: Exception) {
+                    Timber.w(e, "Poll failed")
+                }
             }
         }
+    }
+
+    fun setTourFilter(filter: TourFilter) { _tourFilter.value = filter }
+    fun setFormatFilter(filter: FormatFilter) { _formatFilter.value = filter }
+    fun setCategoryFilter(filter: CategoryFilter) { _categoryFilter.value = filter }
+    fun toggleLiveFilter() {
+        _liveFilter.value = !_liveFilter.value
+        if (_liveFilter.value) _finishedFilter.value = false
+    }
+
+    fun toggleFinishedFilter() {
+        _finishedFilter.value = !_finishedFilter.value
+        if (_finishedFilter.value) _liveFilter.value = false
     }
 
     fun refresh() {
         viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
-            val result = repository.refreshMatches(_selectedDate.value)
-            if (result is Result.Error) {
-                _error.value = result.message
-                _isKeyExpired.value = result.isKeyExpired
+            _isRefreshing.value = true
+            _lastError.value = null
+            try {
+                val dateStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                Timber.d("Refreshing matches for date: $dateStr")
+                val result = repository.fetchOnce()
+                Timber.d("Refresh fetchOnce returned ${result.size} tournaments")
+                _rawToday.value = result
+                if (result.isEmpty()) {
+                    _lastError.value = "Keine Turniere für heute gefunden."
+                }
+                // Sync live rankings in background so ranking badges appear without manual sync
+                launch {
+                    try { playerRepository.syncLiveRankings() } catch (_: Exception) {}
+                    // Re-read tournaments after rankings are written
+                    val enriched = repository.fetchOnce()
+                    if (enriched.isNotEmpty()) _rawToday.value = enriched
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Refresh failed")
+                _lastError.value = buildDetailedError(e)
+            } finally {
+                _isRefreshing.value = false
+                _networkFetchDone.value = true
             }
-
-            // Also refresh live matches
-            repository.refreshLivescores()
-
-            // Wait for Room to emit updated values
-            delay(1000)
-            _isLoading.value = false
         }
     }
 
-    fun selectDate(date: LocalDate) {
-        _selectedDate.value = date
-        refresh()
-    }
-
-    fun dismissKeyExpiredBanner() { _isKeyExpired.value = false }
-
-    fun toggleTourFilter(tour: TourType) {
-        _liveFilter.update { s ->
-            s.copy(tours = if (tour in s.tours) s.tours - tour else s.tours + tour)
+    private fun buildDetailedError(e: Throwable): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("401") || msg.contains("403") -> "🔑 API-Key abgelaufen."
+            msg.contains("404") -> "⚠️ API-Endpunkt nicht gefunden."
+            msg.contains("429") -> "⏱ API-Limit erreicht."
+            msg.contains("UnknownHost") -> "📡 Kein Internet."
+            else -> "❌ Fehler: ${e.localizedMessage}"
         }
     }
 
-    fun toggleCategoryFilter(cat: FilterCategory) {
-        _liveFilter.update { s ->
-            s.copy(categories = if (cat in s.categories) s.categories - cat else s.categories + cat)
+    private fun sortedForToday(list: List<Tournament>): List<Tournament> {
+        return list.sortedWith(
+            compareByDescending<Tournament> { it.category.points }
+                .thenBy {
+                    when {
+                        it.type == "Doubles" -> 2
+                        it.category.name.startsWith("WTA") -> 1
+                        else -> 0
+                    }
+                }
+                .thenBy { it.name }
+        ).map { t ->
+            t.copy(matches = t.matches.sortedWith(
+                compareBy<TennisMatch> { matchSortOrder(it.status) }
+                    .thenBy { it.time }
+            ))
         }
     }
 
-    fun toggleMatchTypeFilter(matchType: MatchType) {
-        _liveFilter.update { s ->
-            s.copy(matchTypes = if (matchType in s.matchTypes) s.matchTypes - matchType else s.matchTypes + matchType)
-        }
-    }
-
-    fun clearLiveFilters() { _liveFilter.value = LiveFilterState() }
-
-    fun dismissTipsOfTheDay() { _tipDismissed.value = true }
-
-    fun setTipThreshold(threshold: Float) {
-        _tipThreshold.value = threshold
-    }
-
-    fun setTipCount(count: Int) {
-        _tipCount.value = count
-    }
-
-    private suspend fun updateTips(tournaments: List<Tournament>) {
-        val allMatches = tournaments.flatMap { it.matches }
-            .filter { it.status != MatchStatus.FINISHED }
-
-        val allTips = allMatches.map { match ->
-            val prediction = predictor.predict(match, null)
-            val homeProb = prediction.player1WinProbability
-            
-            TipOfTheDay(
-                match = match,
-                aiProbHome = homeProb,
-                confidence = maxOf(homeProb, 1f - homeProb)
-            )
-        }.sortedByDescending { it.confidence }
-            .take(10) // Take more, filter in UI
-            .filter { it.confidence > 0.55f } // Lower base threshold
-
-        _tipsOfTheDay.value = allTips
-    }
-
-    fun predict(
-        matchId: String, matchDate: String, tournamentName: String,
-        homePlayerKey: String, homePlayerName: String,
-        awayPlayerKey: String, awayPlayerName: String,
-        winnerKey: String, winnerName: String
-    ) {
-        viewModelScope.launch {
-            // Note: winnerKey is the Player.key from TennisMatch (e.g., "zverev-a")
-            // Save both for matching against match results
-            predictionRepository.savePrediction(
-                matchId             = matchId,
-                predictedWinnerKey  = winnerKey,  // Stored player key for display
-                predictedWinnerName = winnerName,
-                homePlayerKey       = homePlayerKey,
-                homePlayerName      = homePlayerName,
-                awayPlayerKey       = awayPlayerKey,
-                awayPlayerName      = awayPlayerName,
-                matchDate           = matchDate,
-                tournamentName      = tournamentName
-            )
-        }
+    private fun matchSortOrder(status: MatchStatus) = when (status) {
+        MatchStatus.LIVE -> 0
+        MatchStatus.NOT_STARTED, MatchStatus.TBD -> 1
+        MatchStatus.FINISHED -> 2
+        else -> 3
     }
 }

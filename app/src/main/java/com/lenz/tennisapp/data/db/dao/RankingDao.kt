@@ -34,9 +34,6 @@ interface RankingDao {
     @Query("DELETE FROM player_rankings WHERE tour = :tour")
     suspend fun clearTour(tour: String)
 
-    @Query("SELECT * FROM player_rankings")
-    suspend fun getAllRankingsOnce(): List<RankingEntity>
-
     @Query("DELETE FROM player_rankings")
     suspend fun clearAll()
 

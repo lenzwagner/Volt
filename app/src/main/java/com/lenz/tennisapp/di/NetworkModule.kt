@@ -1,7 +1,6 @@
 package com.lenz.tennisapp.di
 
 import com.lenz.tennisapp.data.api.OddsApiService
-import com.lenz.tennisapp.data.api.RankingProxyService
 import com.lenz.tennisapp.data.api.TennisApiService
 import com.lenz.tennisapp.data.api.interceptor.OddsApiKeyInterceptor
 import com.lenz.tennisapp.data.api.interceptor.TennisApiKeyInterceptor
@@ -67,15 +66,21 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRankingProxyService(
-        client: OkHttpClient,
-        moshi: Moshi
-    ): RankingProxyService = Retrofit.Builder()
+    fun provideRankingProxyService(moshi: Moshi): com.lenz.tennisapp.data.api.RankingProxyService = Retrofit.Builder()
         .baseUrl("https://tennis-ranking-proxy.onrender.com/")
-        .client(client)
+        .client(baseOkHttp().build())
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
-        .create(RankingProxyService::class.java)
+        .create(com.lenz.tennisapp.data.api.RankingProxyService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGitHubService(moshi: Moshi): com.lenz.tennisapp.data.api.GitHubService = Retrofit.Builder()
+        .baseUrl("https://api.github.com/")
+        .client(baseOkHttp().build())
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .build()
+        .create(com.lenz.tennisapp.data.api.GitHubService::class.java)
 
     @Provides
     @Singleton

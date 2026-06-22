@@ -1,29 +1,37 @@
 package com.lenz.tennisapp.data.db.entities
 
 import androidx.room.Entity
-import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
- * Central player registry that maps API-Tennis numeric IDs to Elo/Ranking entries.
- *
- * apiKey      → numeric string from API-Tennis (e.g. "1980")
- * lastName    → normalized last name used for fuzzy matching (e.g. "zverev")
- * firstInitial→ first letter of first name (e.g. "a") for disambiguation
- * eloKey      → FK into elo_ratings.playerKey (e.g. "ta_alexander_zverev")
- * rankingKey  → FK into player_rankings.playerKey (e.g. "lt_zverev_alexander")
- */
-@Entity(
-    tableName = "players",
-    indices = [Index("lastName"), Index("apiKey", unique = true)]
-)
+@Entity(tableName = "players")
 data class PlayerEntity(
-    @PrimaryKey val apiKey: String,
-    val displayName: String,        // original name from API-Tennis ("A. Zverev")
-    val lastName: String,           // normalized ("zverev")
-    val firstInitial: String,       // normalized ("a")
-    val tour: String? = null,       // "ATP" | "WTA" | null if unknown
-    val eloKey: String? = null,     // ta_alexander_zverev or null if not matched
-    val rankingKey: String? = null, // lt_zverev_alexander or null if not matched
-    val updatedAt: Long = System.currentTimeMillis()
+    @PrimaryKey val playerKey: String,
+    val name: String,
+    val fullName: String?,
+    val nationality: String?,
+    val birthDate: String?,
+    val photoUrl: String?,
+    val playerType: String?, // "atp" | "wta"
+    val currentRanking: Int?,
+    val currentRankingPoints: Int?,
+    val currentSeasonTitles: Int?,
+    val currentSeasonWins: Int?,
+    val currentSeasonLosses: Int?,
+    val careerHighRanking: Int?,
+    val careerTitles: Int?,
+    val hardWinRate: Double?,
+    val clayWinRate: Double?,
+    val grassWinRate: Double?,
+    val statsJson: String?,       // List<PlayerSeasonStatDto>
+    val tournamentsJson: String?, // List<PlayerTournamentDto>
+    val liveRanking: Int? = null,
+    val liveRankingPoints: Int? = null,
+    val liveRankingScrapedAt: Long? = null,
+    val eloRating: Int? = null,
+    val eloHard: Int? = null,
+    val eloClay: Int? = null,
+    val eloGrass: Int? = null,
+    val eloScrapedAt: Long? = null,
+    val prizeMoneyYtd: Int? = null,
+    val lastUpdatedAt: Long = System.currentTimeMillis()
 )

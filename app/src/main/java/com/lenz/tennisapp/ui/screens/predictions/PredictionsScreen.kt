@@ -1,8 +1,11 @@
 package com.lenz.tennisapp.ui.screens.predictions
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lenz.tennisapp.domain.model.PredictionStats
@@ -105,7 +109,7 @@ fun PredictionsScreen(
                                 "Auswertung",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = AuraPurple
                             )
 
                             Button(
@@ -177,7 +181,7 @@ private fun StatsHeader(stats: PredictionStats) {
             label   = "Gesamt",
             value   = if (stats.totalResolved > 0) "${stats.overallPct}%" else "—",
             sub     = "${stats.correct}/${stats.totalResolved}",
-            color   = MaterialTheme.colorScheme.primary,
+            color   = AuraPurple,
             modifier = Modifier.weight(1f)
         )
         StatChip(
@@ -214,26 +218,36 @@ private fun StatChip(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    ElevatedCard(modifier = modifier) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        color = color.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.12f))
+    ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
                 value,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = color
             )
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
             )
             Text(
                 sub,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -288,7 +302,7 @@ private fun PredictionRow(prediction: UserPrediction) {
                     "Tipp: ${prediction.predictedWinnerName.split(" ").last()}",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = AuraPurple
                 )
                 if (!prediction.isPending && prediction.actualWinnerName != null) {
                     Text(
@@ -312,7 +326,7 @@ private fun PredictionRow(prediction: UserPrediction) {
 @Composable
 private fun ResultBadge(isCorrect: Boolean?) {
     val (emoji, color) = when (isCorrect) {
-        true  -> "✅" to MaterialTheme.colorScheme.primary
+        true  -> "✅" to AuraPurple
         false -> "❌" to MaterialTheme.colorScheme.error
         null  -> "○" to MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -357,25 +371,46 @@ private fun EmptyPredictions() {
 
 // ─── Time range filter ─────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimeRangeFilter(
     selectedRange: PredictionTimeRange,
     onRangeChanged: (PredictionTimeRange) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val entries = PredictionTimeRange.entries
+    val selectedIndex = entries.indexOf(selectedRange)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center
     ) {
-        PredictionTimeRange.entries.forEach { range ->
-            FilterChip(
-                selected = range == selectedRange,
-                onClick = { onRangeChanged(range) },
-                label = { Text(range.label, style = MaterialTheme.typography.labelMedium) },
-                modifier = Modifier.weight(1f)
-            )
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            entries.forEachIndexed { index, range ->
+                SegmentedButton(
+                    selected = index == selectedIndex,
+                    onClick = { onRangeChanged(range) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = entries.size),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = AuraPurple,
+                        activeContentColor = Color.White,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = AuraDeep.copy(alpha = 0.6f),
+                        activeBorderColor = AuraPurple,
+                        inactiveBorderColor = AuraDeep.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Text(
+                        range.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

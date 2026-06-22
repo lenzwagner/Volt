@@ -1,8 +1,11 @@
 package com.lenz.tennisapp.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +22,9 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
+import com.lenz.tennisapp.ui.theme.AuraPurple
+import com.lenz.tennisapp.ui.theme.AuraDeep
+
 /**
  * Simple pie chart showing correct vs incorrect predictions.
  */
@@ -31,15 +37,16 @@ fun PredictionStatsChart(
     if (correct + incorrect == 0) {
         Box(
             modifier = modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                .fillMaxWidth()
+                .height(100.dp)
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .border(BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f)), RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Keine Daten",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "Noch keine Daten verfügbar",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
             )
         }
         return
@@ -53,24 +60,26 @@ fun PredictionStatsChart(
         modifier = modifier
             .fillMaxWidth()
             .height(160.dp)
+            .background(Color.White, RoundedCornerShape(16.dp))
+            .border(BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f)), RoundedCornerShape(16.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Pie chart with actual visualization
         Box(
-            modifier = Modifier.size(140.dp),
+            modifier = Modifier.size(120.dp),
             contentAlignment = Alignment.Center
         ) {
             // Background circle
-            Canvas(modifier = Modifier.size(140.dp)) {
-                val radius = 70.dp.toPx()
-                val center = androidx.compose.ui.geometry.Offset(70.dp.toPx(), 70.dp.toPx())
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val radius = size.minDimension / 2
+                val center = center
 
-                // Correct segment (green)
+                // Correct segment (purple)
                 val correctAngle = (correct * 360f) / total
                 drawArc(
-                    color = Color(0xFF2E7D32),
+                    color = AuraPurple,
                     startAngle = -90f,
                     sweepAngle = correctAngle,
                     useCenter = true,
@@ -80,7 +89,7 @@ fun PredictionStatsChart(
 
                 // Incorrect segment (orange)
                 drawArc(
-                    color = Color(0xFFCC5500),
+                    color = Color(0xFFE65100),
                     startAngle = -90f + correctAngle,
                     sweepAngle = (incorrect * 360f) / total,
                     useCenter = true,
@@ -89,22 +98,22 @@ fun PredictionStatsChart(
                 )
             }
 
-            // Center text
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            // Center hole for donut look
+            Box(
+                modifier = Modifier
+                    .size(70.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "${(correct * 100) / total}%",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White
-                )
-                Text(
-                    "korrekt",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "${(correct * 100) / total}%",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = AuraDeep
+                    )
+                }
             }
         }
 
@@ -113,53 +122,45 @@ fun PredictionStatsChart(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.weight(1f)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2E7D32))
-                )
-                Column {
-                    Text(
-                        "$correct richtig",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "$correctPercent%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            LegendItem(
+                label = "Korrekt",
+                count = correct,
+                percent = correctPercent,
+                color = AuraPurple
+            )
+            LegendItem(
+                label = "Falsch",
+                count = incorrect,
+                percent = incorrectPercent,
+                color = Color(0xFFE65100)
+            )
+        }
+    }
+}
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFCC5500))
-                )
-                Column {
-                    Text(
-                        "$incorrect falsch",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "$incorrectPercent%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+@Composable
+private fun LegendItem(label: String, count: Int, percent: Int, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Column {
+            Text(
+                "$label ($count)",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "$percent%",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Gray
+            )
         }
     }
 }

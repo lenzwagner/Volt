@@ -39,5 +39,6 @@ fun Surface.toCourtType() = when (this) {
     Surface.GRASS       -> CourtType.GRASS
     Surface.HARD,
     Surface.INDOOR_HARD -> CourtType.HARD
+    Surface.CLAY -> CourtType.CLAY
     else                -> CourtType.HARD
 }

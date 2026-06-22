@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MatchDao {
-    @Query("SELECT * FROM matches WHERE date = :date ORDER BY tournamentCategory, leagueName, time")
+    @Query("SELECT * FROM matches WHERE substr(date, 1, 10) = :date ORDER BY tournamentCategory, leagueName, time")
     fun getMatchesForDate(date: String): Flow<List<MatchEntity>>
 
     @Query("SELECT * FROM matches WHERE isLive = 1 ORDER BY date ASC, time ASC")
@@ -16,6 +16,9 @@ interface MatchDao {
 
     @Query("SELECT * FROM matches")
     fun getAllMatches(): Flow<List<MatchEntity>>
+
+    @Query("DELETE FROM matches")
+    suspend fun deleteAllMatches()
 
     @Query("SELECT * FROM matches WHERE id = :id")
     suspend fun getMatchById(id: String): MatchEntity?
@@ -26,17 +29,55 @@ interface MatchDao {
     @Query("SELECT * FROM matches WHERE homePlayerKey = :playerKey OR awayPlayerKey = :playerKey ORDER BY date DESC, time DESC")
     suspend fun getMatchesByPlayerKeyList(playerKey: String): List<MatchEntity>
 
-    @Upsert
-    suspend fun upsertMatches(matches: List<MatchEntity>)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMatchesIfAbsent(matches: List<MatchEntity>)
+
+    @Query("""
+        UPDATE matches SET
+            date = :date, time = :time,
+            homePlayer = :homePlayer, homePlayerKey = :homePlayerKey,
+            awayPlayer = :awayPlayer, awayPlayerKey = :awayPlayerKey,
+            finalResult = :finalResult, gameResult = :gameResult,
+            status = :status, isLive = :isLive,
+            leagueName = :leagueName, leagueId = :leagueId,
+            round = :round, surface = :surface,
+            tournamentCategory = :tournamentCategory, eventType = :eventType,
+            winnerId = :winnerId, statsJson = :statsJson,
+            firstPlayerLogo = :firstPlayerLogo, secondPlayerLogo = :secondPlayerLogo,
+            serve = :serve, cachedAt = :cachedAt
+        WHERE id = :id
+    """)
+    suspend fun updateMatchPreservingOdds(
+        id: String, date: String, time: String,
+        homePlayer: String, homePlayerKey: String,
+        awayPlayer: String, awayPlayerKey: String,
+        finalResult: String?, gameResult: String?,
+        status: String, isLive: Boolean,
+        leagueName: String, leagueId: String,
+        round: String?, surface: String?,
+        tournamentCategory: String, eventType: String,
+        winnerId: String?, statsJson: String?,
+        firstPlayerLogo: String?, secondPlayerLogo: String?,
+        serve: String?, cachedAt: Long
+    )
 
     @Query("DELETE FROM matches WHERE date = :date")
     suspend fun deleteMatchesForDate(date: String)
 
-    @Query("SELECT MAX(cachedAt) FROM matches WHERE date = :date")
-    suspend fun getLatestCachedAt(date: String): Long?
-
     @Query("DELETE FROM matches WHERE cachedAt < :timestamp")
     suspend fun deleteOldMatches(timestamp: Long)
+
+    @Query("UPDATE matches SET isLive = 0 WHERE isLive = 1 AND id NOT IN (:liveIds)")
+    suspend fun resetStaleLive(liveIds: List<String>)
+
+    @Query("UPDATE matches SET oddsJson = :oddsJson, oddsSyncedAt = :syncedAt WHERE id = :matchId")
+    suspend fun updateOdds(matchId: String, oddsJson: String, syncedAt: Long)
+
+    @Query("SELECT * FROM matches WHERE substr(date, 1, 10) = :date AND (status != 'Finished' AND status != 'Retired' AND status != 'Walkover')")
+    suspend fun getOpenMatchesForDate(date: String): List<MatchEntity>
+
+    @Query("SELECT oddsSyncedAt FROM matches WHERE id = :matchId")
+    suspend fun getOddsSyncedAt(matchId: String): Long?
 }
 
 @Dao

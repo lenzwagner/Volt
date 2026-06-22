@@ -424,7 +424,7 @@ private fun RankingsContent(state: PlayerDetailUiState) {
                 Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = AuraPurple, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "${state.ranking ?: "—"}. (${state.rankingPoints?.let { "$it PTS" } ?: "— PTS"})",
+                    "${state.ranking ?: "—"}. (${state.rankingPoints ?: 0} PTS)",
                     color = AuraPurple,
                     fontWeight = FontWeight.Black
                 )
@@ -599,17 +599,51 @@ private fun PlayerMatchLine(
             modifier = Modifier.weight(1f)
         )
         scoreParts.forEach { part ->
-            val games = if (part.contains("-")) {
+            val scoreString = if (part.contains("-")) {
                 val p = part.split("-")
-                if (isOpponent) p.firstOrNull() else p.lastOrNull()
+                if (isOpponent) p.firstOrNull()?.trim() ?: "" else p.lastOrNull()?.trim() ?: ""
             } else ""
+            
+            ScoreDigit(
+                score = scoreString,
+                won = won
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScoreDigit(score: String, won: Boolean) {
+    val games = when {
+        "(" in score -> score.substring(0, score.indexOf("("))
+        "." in score -> score.substring(0, score.indexOf("."))
+        else -> score
+    }
+    val tbPoints = when {
+        "(" in score -> score.substring(score.indexOf("(") + 1, score.indexOf(")"))
+        "." in score -> score.substring(score.indexOf(".") + 1)
+        else -> null
+    }
+    val hasDot = "." in score
+
+    Row(
+        modifier = Modifier.width(24.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = if (hasDot) "$games." else games,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (won) FontWeight.Black else FontWeight.Normal,
+            color = if (won) AuraPurple else Color.LightGray,
+            textAlign = TextAlign.Center
+        )
+        if (tbPoints != null) {
             Text(
-                games ?: "", 
-                style = MaterialTheme.typography.bodySmall, 
-                fontWeight = if (won) FontWeight.Black else FontWeight.Normal,
-                color = if (won) AuraPurple else Color.LightGray,
-                modifier = Modifier.width(20.dp),
-                textAlign = TextAlign.Center
+                text = tbPoints,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (won) AuraPurple.copy(alpha = 0.7f) else Color.LightGray,
             )
         }
     }
