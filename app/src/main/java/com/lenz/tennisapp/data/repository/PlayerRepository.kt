@@ -78,7 +78,7 @@ class PlayerRepository @Inject constructor(
                         val keyMap = buildNameKeyMap(tour)
                         var matched = 0
                         response.data.forEach { dto ->
-                            val playerKey = nameMatchKey(dto.name)?.let { keyMap[it] }
+                            val playerKey = nameMatchKeys(dto.name).firstNotNullOfOrNull { keyMap[it] }
                             if (playerKey != null) {
                                 playerDao.updateElo(playerKey, dto.elo, dto.eloHard, dto.eloClay, dto.eloGrass, now)
                                 matched++
@@ -108,7 +108,7 @@ class PlayerRepository @Inject constructor(
                         var matched = 0
                         response.data.forEach { dto ->
                             if (dto.prizeUsd == null) return@forEach
-                            val playerKey = nameMatchKey(dto.name)?.let { keyMap[it] }
+                            val playerKey = nameMatchKeys(dto.name).firstNotNullOfOrNull { keyMap[it] }
                             if (playerKey != null) {
                                 playerDao.updatePrizeMoney(playerKey, dto.prizeUsd)
                                 matched++
@@ -129,7 +129,7 @@ class PlayerRepository @Inject constructor(
         val keyMap = buildNameKeyMap(tour)
         var matched = 0
         rankings.forEach { r ->
-            val playerKey = nameMatchKey(r.name)?.let { keyMap[it] }
+            val playerKey = nameMatchKeys(r.name).firstNotNullOfOrNull { keyMap[it] }
             if (playerKey != null) {
                 playerDao.updateLiveRanking(playerKey, r.rank, r.points, now)
                 r.careerHighRank?.let { playerDao.updateCareerHighRanking(playerKey, it) }
@@ -144,10 +144,13 @@ class PlayerRepository @Inject constructor(
      * Players with an unknown tour are included so they can still be matched.
      */
     private suspend fun buildNameKeyMap(tour: String): Map<String, String> {
-        return playerDao.getAll()
+        val map = HashMap<String, String>()
+        playerDao.getAll()
             .filter { it.playerType == null || it.playerType.equals(tour, ignoreCase = true) }
-            .mapNotNull { p -> nameMatchKey(p.name)?.let { it to p.playerKey } }
-            .toMap()
+            .forEach { p ->
+                nameMatchKeys(p.name).forEach { key -> map.putIfAbsent(key, p.playerKey) }
+            }
+        return map
     }
 
     companion object {
@@ -156,8 +159,16 @@ class PlayerRepository @Inject constructor(
          * proxy format ("Ben Shelton") and the api-tennis format ("B. Shelton") collapse
          * to the same key ("shelton b").
          */
-        fun nameMatchKey(raw: String?): String? {
-            if (raw.isNullOrBlank()) return null
+        fun nameMatchKey(raw: String?): String? = nameMatchKeys(raw).firstOrNull()
+
+        /**
+         * Candidate match keys for a name, order-independent. The api-tennis source
+         * sometimes lists the surname first ("Zheng Q.") and the proxy lists it last
+         * ("Qinwen Zheng"); generating both orderings lets them collapse to a common
+         * key ("zheng q"). Returns keys as "surname initial".
+         */
+        fun nameMatchKeys(raw: String?): List<String> {
+            if (raw.isNullOrBlank()) return emptyList()
             val noAccents = java.text.Normalizer
                 .normalize(raw, java.text.Normalizer.Form.NFD)
                 .replace("\\p{M}+".toRegex(), "")
@@ -166,10 +177,11 @@ class PlayerRepository @Inject constructor(
                 .split(" ", "-")
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
-            if (tokens.isEmpty()) return null
-            val initial = tokens.first().first()
-            val surname = tokens.last()
-            return "$surname $initial"
+            if (tokens.size < 2) return tokens.firstOrNull()?.let { listOf("$it ${it.first()}") } ?: emptyList()
+            val a = tokens.first()
+            val b = tokens.last()
+            // both interpretations: (surname=b, first=a) and (surname=a, first=b)
+            return listOf("$b ${a.first()}", "$a ${b.first()}").distinct()
         }
     }
 

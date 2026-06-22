@@ -108,9 +108,7 @@ fun PlayerAvatarWithRanking(
                 else -> rankingFontSize
             }
             Surface(
-                modifier = Modifier
-                    .size(badgeSize)
-                    .offset(x = (badgeSize.value * 0.2f).dp, y = (badgeSize.value * 0.2f).dp),
+                modifier = Modifier.size(badgeSize),
                 shape = CircleShape,
                 color = AuraDeep,
                 border = androidx.compose.foundation.BorderStroke(1.dp, AuraLime)
