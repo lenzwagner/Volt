@@ -136,7 +136,7 @@ fun PredictionsScreen(
                             // Format date from "2026-06-05" to "5. Juni 2026"
                             val parsedDate = try {
                                 val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.GERMAN)
-                                val outputFormat = SimpleDateFormat("d. MMMM yyyy", Locale.GERMAN)
+                                val outputFormat = SimpleDateFormat("d. MMMM", Locale.GERMAN)
                                 val date = inputFormat.parse(dateStr)
                                 outputFormat.format(date)
                             } catch (e: Exception) {

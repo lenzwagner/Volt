@@ -2,6 +2,8 @@ package com.lenz.tennisapp.ui.screens.airecommendations
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import java.text.SimpleDateFormat
+import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -81,7 +83,14 @@ fun AiRecommendationsScreen(
                             Icon(Icons.Filled.AutoAwesome, null, tint = AuraPurple, modifier = Modifier.size(16.dp))
                             Text("KI-Empfehlungen", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Black, color = AuraPurple)
                         }
-                        Text(state.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val displayDate = remember(state.date) {
+                            try {
+                                val inf = SimpleDateFormat("yyyy-MM-dd", Locale.GERMAN)
+                                val outf = SimpleDateFormat("d. MMMM", Locale.GERMAN)
+                                outf.format(inf.parse(state.date)!!)
+                            } catch (e: Exception) { state.date }
+                        }
+                        Text(displayDate, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
