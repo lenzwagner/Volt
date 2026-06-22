@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import kotlin.math.abs
 
@@ -57,6 +58,10 @@ class AiRecommendationsViewModel @Inject constructor(
                 val response = repository.getAiPredictions()
                 val data = response?.data
                 val matches = data?.matches ?: emptyList()
+                matches.take(5).forEach { m ->
+                    Timber.d("AI_SORT conf=%.3f p1=%.3f p2=%.3f absDiff=%.3f %s vs %s"
+                        .format(m.confidence, m.p1Prob, m.p2Prob, abs(m.p1Prob - m.p2Prob), m.p1Fullname, m.p2Fullname))
+                }
                 val mode = _uiState.value.sortMode
                 _uiState.value = _uiState.value.copy(
                     matches = matches,
