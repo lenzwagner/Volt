@@ -38,6 +38,7 @@ import com.lenz.tennisapp.ui.screens.home.HomeViewModel
 import com.lenz.tennisapp.ui.screens.match.MatchDetailScreen
 import com.lenz.tennisapp.ui.screens.player.PlayerDetailScreen
 import com.lenz.tennisapp.ui.screens.tournament.TournamentDetailScreen
+import com.lenz.tennisapp.ui.screens.airecommendations.AiRecommendationsScreen
 import com.lenz.tennisapp.ui.screens.predictions.PredictionsScreen
 import com.lenz.tennisapp.ui.screens.settings.SettingsScreen
 import com.lenz.tennisapp.ui.theme.*
@@ -51,12 +52,13 @@ sealed class Screen(
     val iconSelected: ImageVector,
     val tabIndex: Int
 ) {
-    object Home        : Screen("home",        "Heute",     Icons.Outlined.SportsTennis,       Icons.Filled.SportsTennis, 0)
-    object Predictions : Screen("predictions", "Prognosen", Icons.Outlined.Lightbulb,          Icons.Filled.Lightbulb, 1)
-    object Settings    : Screen("settings",    "Mehr",      Icons.Outlined.Settings,           Icons.Filled.Settings, 2)
+    object Home            : Screen("home",            "Heute",       Icons.Outlined.SportsTennis,  Icons.Filled.SportsTennis, 0)
+    object Predictions     : Screen("predictions",     "Vorhersagen", Icons.Outlined.Lightbulb,     Icons.Filled.Lightbulb,    1)
+    object AiRecommend     : Screen("ai_recommend",    "KI-Tipps",    Icons.Outlined.AutoAwesome,   Icons.Filled.AutoAwesome,  2)
+    object Settings        : Screen("settings",        "Mehr",        Icons.Outlined.Settings,      Icons.Filled.Settings,     3)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Predictions, Screen.Settings)
+val bottomNavItems = listOf(Screen.Home, Screen.Predictions, Screen.AiRecommend, Screen.Settings)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -199,14 +201,16 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                 GreenHeader(
                     title    = when (pagerState.currentPage) {
                         0 -> "Tennis Today"
-                        1 -> "AI Predictor"
-                        2 -> "Settings"
+                        1 -> "Vorhersagen"
+                        2 -> "KI-Empfehlungen"
+                        3 -> "Settings"
                         else -> "Tennis"
                     },
                     subtitle = when (pagerState.currentPage) {
                         0 -> "Matches"
-                        1 -> "Hit rate statistics"
-                        2 -> "System config"
+                        1 -> "Deine Trefferquote"
+                        2 -> "Tägliche KI-Prognosen"
+                        3 -> "System config"
                         else -> null
                     },
                     court = TennisApplication.sessionCourt,
@@ -233,7 +237,8 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         showHeader = false,
                         onMatchClick = { navController.navigate("match/$it") }
                     )
-                    2 -> SettingsScreen(showHeader = false)
+                    2 -> AiRecommendationsScreen()
+                    3 -> SettingsScreen(showHeader = false)
                 }
             }
         }
@@ -249,6 +254,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         ) {
             composable(Screen.Home.route) {}
             composable(Screen.Predictions.route) {}
+            composable(Screen.AiRecommend.route) {}
             composable(Screen.Settings.route) {}
 
             composable(
@@ -442,7 +448,7 @@ fun FloatingAuraNavigationBar(
 ) {
     Surface(
         modifier = Modifier
-            .width(320.dp)
+            .width(380.dp)
             .height(76.dp),
         color = AuraDeep.copy(alpha = 0.96f),
         shape = CircleShape,

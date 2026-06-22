@@ -66,6 +66,8 @@ class TennisRepository @Inject constructor(
     private val PREDICTIONS_TTL_MS = 15 * 60 * 1000L
     private val predictionsMutex = kotlinx.coroutines.sync.Mutex()
 
+    suspend fun getAiPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? = getCachedPredictions()
+
     private suspend fun getCachedPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? {
         val now = System.currentTimeMillis()
         cachedPredictions?.let { if (now - predictionsCachedAt < PREDICTIONS_TTL_MS) return it }
