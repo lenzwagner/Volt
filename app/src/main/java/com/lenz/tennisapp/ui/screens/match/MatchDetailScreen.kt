@@ -600,14 +600,15 @@ private fun PredictionBanner(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = AuraDeep
+        color = Color.White,
+        border = BorderStroke(1.dp, AuraDeep.copy(alpha = 0.08f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         "Wer wird gewinnen?",
-                        color = Color.White,
+                        color = AuraDeep,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black
                     )
@@ -620,7 +621,7 @@ private fun PredictionBanner(
                             pickedKey != null -> "Dein Tipp ist gespeichert"
                             else -> "Tippe vor Spielbeginn"
                         },
-                        color = Color.White.copy(alpha = 0.55f),
+                        color = AuraDeep.copy(alpha = 0.45f),
                         fontSize = 12.sp
                     )
                 }
@@ -670,8 +671,8 @@ private fun PredictionOption(
         false -> Color(0xFFEF4444)
         null -> AuraPurple
     }
-    val bg = if (selected) accent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f)
-    val border = if (selected) accent else Color.White.copy(alpha = 0.12f)
+    val bg = if (selected) accent.copy(alpha = 0.12f) else AuraDeep.copy(alpha = 0.04f)
+    val border = if (selected) accent else AuraDeep.copy(alpha = 0.12f)
 
     Surface(
         modifier = modifier
@@ -686,7 +687,7 @@ private fun PredictionOption(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f))) {
+            Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(AuraDeep.copy(alpha = 0.08f))) {
                 if (!player.logoUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = player.logoUrl,
@@ -696,13 +697,13 @@ private fun PredictionOption(
                     )
                 } else {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(player.name.take(1), color = Color.White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                        Text(player.name.take(1), color = AuraDeep, fontWeight = FontWeight.Black, fontSize = 13.sp)
                     }
                 }
             }
             Text(
                 player.name.split(" ").last(),
-                color = Color.White,
+                color = if (selected) accent else AuraDeep.copy(alpha = 0.7f),
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Black else FontWeight.Medium,
                 maxLines = 1,
@@ -712,7 +713,7 @@ private fun PredictionOption(
             when {
                 outcome == true -> Icon(Icons.Default.Check, null, tint = AuraLime, modifier = Modifier.size(18.dp))
                 outcome == false -> Icon(Icons.Default.Close, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
-                !enabled && !selected -> Icon(Icons.Default.Lock, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                !enabled && !selected -> Icon(Icons.Default.Lock, null, tint = AuraDeep.copy(alpha = 0.25f), modifier = Modifier.size(14.dp))
             }
         }
     }
