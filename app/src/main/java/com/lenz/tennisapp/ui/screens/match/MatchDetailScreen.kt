@@ -553,10 +553,12 @@ private fun PlayerScoreRow(
                     Text(myScore.toString(), fontSize = 21.sp, fontWeight = weight, color = color)
                 }
 
-                // Separator + game points
+                // Separator + game points (fixed-width box so 0/15/30/40/AD don't shift layout)
                 if (gamePoints.isNotBlank()) {
                     Text("|", fontSize = 21.sp, color = Color.White.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 2.dp))
-                    Text(gamePoints, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Box(modifier = Modifier.width(42.dp), contentAlignment = Alignment.CenterStart) {
+                        Text(gamePoints, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
             }
 
