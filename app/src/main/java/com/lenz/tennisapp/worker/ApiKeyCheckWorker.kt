@@ -27,7 +27,6 @@ class ApiKeyCheckWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         checkTennisKey()
-        checkOddsQuota()
         return Result.success()
     }
 
@@ -54,15 +53,5 @@ class ApiKeyCheckWorker @AssistedInject constructor(
                 keyStore.setTennisKeyExpired(false)
             }
         } catch (_: Exception) {}
-    }
-
-    private suspend fun checkOddsQuota() {
-        val remaining = keyStore.oddsRequestsRemaining.first()
-        val expired = keyStore.oddsKeyExpired.first()
-
-        when {
-            expired -> NotificationHelper.notifyOddsKeyExpired(applicationContext)
-            remaining in 1..50 -> NotificationHelper.notifyOddsLow(applicationContext, remaining)
-        }
     }
 }

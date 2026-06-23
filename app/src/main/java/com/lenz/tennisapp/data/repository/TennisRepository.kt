@@ -1048,11 +1048,12 @@ class TennisRepository @Inject constructor(
         val matches = matchDao.getOpenMatchesForDate(today)
         if (matches.isEmpty()) return
 
+        val oddsKey = keyStore.oddsBlazKey.first()
         // Fetch all three leagues once
         val eventsByLeague = mutableMapOf<String, List<com.lenz.tennisapp.data.api.dto.OddsBlazEvent>>()
         for (league in listOf("atp", "wta", "challenger")) {
             try {
-                eventsByLeague[league] = oddsBlaz.getOdds(league = league).events
+                eventsByLeague[league] = oddsBlaz.getOdds(league = league, key = oddsKey).events
             } catch (e: Exception) {
                 Timber.w("OddsBlaz fetch failed for $league: ${e.message}")
             }
@@ -1113,13 +1114,14 @@ class TennisRepository @Inject constructor(
 
     private suspend fun fetchOddsForMatch(match: TennisMatch): List<BookmakerOdds> {
         return try {
+            val oddsKey = keyStore.oddsBlazKey.first()
             val p1Search = getBestNamePart(match.homePlayer.name)
             val p2Search = getBestNamePart(match.awayPlayer.name)
             Timber.d("OddsBlaz: fetching for $p1Search vs $p2Search")
 
             for (league in oddsBlazLeaguesFor(match.eventType)) {
                 val events = try {
-                    oddsBlaz.getOdds(league = league).events
+                    oddsBlaz.getOdds(league = league, key = oddsKey).events
                 } catch (e: Exception) {
                     Timber.w("OddsBlaz league=$league failed: ${e.message}")
                     continue

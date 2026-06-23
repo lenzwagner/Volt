@@ -143,6 +143,22 @@ private fun ApiSettingsBox(
                         onTest = { viewModel.testTennisKey(it) }
                     )
 
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // OddsBlaze Section
+                    ApiKeySection(
+                        title = "OddsBlaze",
+                        subtitle = "odds.oddsblaze.com",
+                        currentKey = state.oddsBlazKey,
+                        isExpired = false,
+                        statusText = "Aktiv",
+                        isTesting = false,
+                        testResult = null,
+                        signupUrl = "https://oddsblaze.com",
+                        onSave = viewModel::saveOddsBlazKey,
+                        onTest = {}
+                    )
+
                 }
             }
         }

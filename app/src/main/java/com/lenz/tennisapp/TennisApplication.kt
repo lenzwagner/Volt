@@ -86,10 +86,6 @@ class TennisApplication : Application(), Configuration.Provider, SingletonImageL
         // Cancel any previously scheduled bulk odds sync — odds are fetched on-demand only
         WorkManager.getInstance(this).cancelUniqueWork(com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME)
 
-        // Always reset expired flag on startup — the interceptor re-sets it if the key is truly dead
-        CoroutineScope(Dispatchers.IO).launch {
-            apiKeyStore.setOddsKeyExpired(false)
-        }
         // Odds are fetched on-demand when user opens a match (max 1 call/match/day)
     }
 

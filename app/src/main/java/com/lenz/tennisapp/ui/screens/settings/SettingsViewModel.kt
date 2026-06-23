@@ -15,7 +15,8 @@ data class SettingsUiState(
     val tennisKey: String = "",
     val tennisKeyExpired: Boolean = false,
     val isTestingTennis: Boolean = false,
-    val tennisTestResult: String? = null
+    val tennisTestResult: String? = null,
+    val oddsBlazKey: String = ""
 )
 
 @HiltViewModel
@@ -31,13 +32,15 @@ class SettingsViewModel @Inject constructor(
         keyStore.tennisApiKey,
         keyStore.tennisKeyExpired,
         _isTestingTennis,
-        _tennisTestResult
-    ) { key, expired, testing, result ->
+        _tennisTestResult,
+        keyStore.oddsBlazKey
+    ) { tennisKey, expired, testing, result, oddsKey ->
         SettingsUiState(
-            tennisKey = key,
+            tennisKey = tennisKey,
             tennisKeyExpired = expired,
             isTestingTennis = testing,
-            tennisTestResult = result
+            tennisTestResult = result,
+            oddsBlazKey = oddsKey
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -46,6 +49,10 @@ class SettingsViewModel @Inject constructor(
             keyStore.setTennisKey(key.trim())
             _tennisTestResult.value = null
         }
+    }
+
+    fun saveOddsBlazKey(key: String) {
+        viewModelScope.launch { keyStore.setOddsBlazKey(key.trim()) }
     }
 
     fun testTennisKey(key: String) {
