@@ -9,6 +9,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -1022,7 +1024,7 @@ private fun FormSection(
     p2Matches: List<TennisMatch>
 ) {
     SectionTitle("AKTUELLE FORM")
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(8.dp))
 
     val p1Form = p1Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p1.key }.reversed()
     val p2Form = p2Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p2.key }.reversed()
@@ -1036,32 +1038,73 @@ private fun FormSection(
             textAlign = TextAlign.Center
         )
     } else {
-        listOf(p1 to p1Form, p2 to p2Form).forEach { (player, form) ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+        val pages = listOf(p1 to p1Form, p2 to p2Form)
+        val pagerState = rememberPagerState { pages.size }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+            val (player, form) = pages[page]
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 2.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = AuraDeep.copy(alpha = 0.06f),
+                tonalElevation = 0.dp
             ) {
-                Text(
-                    player.name.split(" ").last(),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = AuraDeep,
-                    modifier = Modifier.width(72.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                // Y-axis labels
-                Column(
-                    modifier = Modifier.width(14.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.End
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("G", fontSize = 8.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(24.dp))
-                    Text("V", fontSize = 8.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.width(64.dp)) {
+                        Text(
+                            player.name.split(" ").last(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AuraDeep,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(Modifier.size(7.dp).background(Color(0xFF4CAF50), CircleShape))
+                            Text("W", fontSize = 9.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.SemiBold)
+                            Box(Modifier.size(7.dp).background(Color(0xFFFF9800), CircleShape))
+                            Text("L", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    FormGraph(form = form, modifier = Modifier.weight(1f))
                 }
-                Spacer(Modifier.width(4.dp))
-                FormGraph(form = form, modifier = Modifier.weight(1f))
+            }
+        }
+
+        // Page indicator dots
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            pages.indices.forEach { i ->
+                val selected = pagerState.currentPage == i
+                Box(
+                    Modifier
+                        .padding(horizontal = 3.dp)
+                        .size(if (selected) 8.dp else 5.dp)
+                        .background(
+                            if (selected) AuraPurple else AuraDeep.copy(alpha = 0.25f),
+                            CircleShape
+                        )
+                )
             }
         }
     }
