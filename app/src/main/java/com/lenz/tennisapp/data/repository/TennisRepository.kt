@@ -884,11 +884,16 @@ class TennisRepository @Inject constructor(
                 }
                 val k1 = nameKey(match.homePlayer.name)
                 val k2 = nameKey(match.awayPlayer.name)
+                Timber.d("PRED_MATCH keys home=$k1 away=$k2")
+                resp.data.matches.take(3).forEach { m ->
+                    Timber.d("PRED_MATCH candidate ${nameKey(m.p1Fullname)} vs ${nameKey(m.p2Fullname)}")
+                }
                 resp.data.matches.firstOrNull { m ->
                     val mk1 = nameKey(m.p1Fullname)
                     val mk2 = nameKey(m.p2Fullname)
                     (mk1 == k1 && mk2 == k2) || (mk1 == k2 && mk2 == k1)
                 }?.let { m ->
+                    Timber.d("PRED_MATCH found: ${m.p1Fullname} vs ${m.p2Fullname}")
                     val isSwapped = nameKey(m.p1Fullname) == k2
                     val p1Prob = if (isSwapped) m.p2Prob else m.p1Prob
                     val p2Prob = if (isSwapped) m.p1Prob else m.p2Prob
@@ -902,11 +907,35 @@ class TennisRepository @Inject constructor(
                         },
                         factors = emptyList()
                     )
+                } ?: run { Timber.w("PRED_MATCH no match for $k1 vs $k2 in ${resp.data.matches.size} predictions"); null }
+            } else { Timber.w("PRED_MATCH resp null/failed success=${resp?.success}"); null }
+        } catch (e: Exception) { Timber.e(e, "PRED_MATCH exception"); null }
+        // Fallback: try aiNameKey approach if externalPrediction lookup failed
+        val prediction = externalPrediction ?: run {
+            val resp2 = cachedPredictions
+            if (resp2?.data != null) {
+                val k1a = aiNameKey(match.homePlayer.name)
+                val k2a = aiNameKey(match.awayPlayer.name)
+                Timber.d("PRED_MATCH fallback aiNameKey home=$k1a away=$k2a")
+                resp2.data.matches.firstOrNull { m ->
+                    val mk1 = aiNameKey(m.p1Fullname); val mk2 = aiNameKey(m.p2Fullname)
+                    (mk1 == k1a && mk2 == k2a) || (mk1 == k2a && mk2 == k1a)
+                }?.let { m ->
+                    Timber.d("PRED_MATCH fallback found: ${m.p1Fullname} vs ${m.p2Fullname}")
+                    val isSwapped = aiNameKey(m.p1Fullname) == k2a
+                    MatchPrediction(
+                        player1WinProbability = if (isSwapped) m.p2Prob else m.p1Prob,
+                        player2WinProbability = if (isSwapped) m.p1Prob else m.p2Prob,
+                        confidence = when {
+                            m.confidence >= 0.65f -> PredictionConfidence.HIGH
+                            m.confidence >= 0.35f -> PredictionConfidence.MEDIUM
+                            else -> PredictionConfidence.LOW
+                        },
+                        factors = emptyList()
+                    )
                 }
             } else null
-        } catch (e: Exception) { null }
-        // External prediction only — no internal fallback. Null = section hidden.
-        val prediction = externalPrediction
+        }
 
         // If match just finished, prepend it to H2H so the result shows immediately
         fun inferWinner(score: String?, hKey: String, aKey: String): String? {
