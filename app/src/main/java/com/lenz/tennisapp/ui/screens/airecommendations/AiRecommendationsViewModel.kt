@@ -20,14 +20,16 @@ enum class AiSortMode(val label: String) {
 }
 
 enum class AiTourFilter(val label: String) {
-    ALL("Alle"), ATP("ATP"), WTA("WTA"), DOUBLES("Doubles")
+    ALL("Alle"), ATP("ATP"), WTA("WTA"), DOUBLES("Doubles");
+    override fun toString() = label
 }
 
 enum class AiCategoryFilter(val label: String, val minPoints: Int) {
     ALL("Alle", 0),
     F500("500+", 500),
     F1000("1000+", 1000),
-    GS("Grand Slam", 2000)
+    GS("Grand Slam", 2000);
+    override fun toString() = label
 }
 
 data class EnrichedAiPrediction(

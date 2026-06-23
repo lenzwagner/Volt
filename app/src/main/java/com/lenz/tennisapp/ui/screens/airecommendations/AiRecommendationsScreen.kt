@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.*
@@ -23,17 +26,22 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lenz.tennisapp.data.api.PredictionMatchDto
+import com.lenz.tennisapp.ui.screens.home.FilterSection
 import com.lenz.tennisapp.ui.theme.*
 
 private fun PredictionMatchDto.isTopPick(): Boolean =
@@ -54,6 +62,10 @@ fun AiRecommendationsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var allExpanded by remember { mutableStateOf(false) }
+    var showFilters by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val activeFilterCount = (if (state.tourFilter != AiTourFilter.ALL) 1 else 0) +
+                            (if (state.categoryFilter != AiCategoryFilter.ALL) 1 else 0)
 
     val topPicks = remember(state.filtered) {
         state.filtered.filter { it.dto.isTopPick() }.sortedByDescending { it.dto.sortScore(AiSortMode.WEIGHTED) }
@@ -93,59 +105,38 @@ fun AiRecommendationsScreen(
                 }
             }
 
-            // ── Tour filter chips ─────────────────────────────────────────
+            // ── Filter button row ─────────────────────────────────────────
             item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(AiTourFilter.entries.size) { i ->
-                        val f = AiTourFilter.entries[i]
-                        FilterChip(
-                            selected = state.tourFilter == f,
-                            onClick = { viewModel.setTourFilter(f) },
-                            label = { Text(f.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AuraPurple,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.tourFilter == f,
-                                borderColor = AuraDeep.copy(alpha = 0.15f),
-                                selectedBorderColor = AuraPurple
-                            )
-                        )
+                    Surface(
+                        onClick = { showFilters = true },
+                        color = AuraDeep,
+                        shape = CircleShape,
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (activeFilterCount > 0) {
+                                Box(
+                                    modifier = Modifier.size(20.dp).background(Color.White, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(activeFilterCount.toString(), color = AuraDeep, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
+                            } else {
+                                Icon(Icons.Outlined.FilterList, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                            Text("Filter", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
-            }
-
-            // ── Category filter chips ─────────────────────────────────────
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(AiCategoryFilter.entries.size) { i ->
-                        val f = AiCategoryFilter.entries[i]
-                        FilterChip(
-                            selected = state.categoryFilter == f,
-                            onClick = { viewModel.setCategoryFilter(f) },
-                            label = { Text(f.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AuraPurple,
-                                selectedLabelColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = state.categoryFilter == f,
-                                borderColor = AuraDeep.copy(alpha = 0.15f),
-                                selectedBorderColor = AuraPurple
-                            )
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
             }
 
             // ── Loading / Error / Empty ───────────────────────────────────
@@ -294,6 +285,73 @@ fun AiRecommendationsScreen(
                 }
             }
         }
+    }
+
+    // ── Filter BottomSheet ────────────────────────────────────────────────────
+    if (showFilters) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        val window = (view.context as? android.app.Activity)?.window
+        DisposableEffect(Unit) {
+            window?.let { w ->
+                val ctrl = androidx.core.view.WindowCompat.getInsetsController(w, view)
+                w.navigationBarColor = android.graphics.Color.parseColor("#1D1B20")
+                ctrl.isAppearanceLightNavigationBars = false
+            }
+            onDispose {
+                window?.let { w ->
+                    val ctrl = androidx.core.view.WindowCompat.getInsetsController(w, view)
+                    w.navigationBarColor = android.graphics.Color.WHITE
+                    ctrl.isAppearanceLightNavigationBars = true
+                }
+            }
+        }
+        ModalBottomSheet(
+            onDismissRequest = { showFilters = false },
+            sheetState = sheetState,
+            containerColor = Color.Transparent,
+            dragHandle = null,
+            contentWindowInsets = { WindowInsets(0) }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.55f)
+                    .background(AuraDeep, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+            ) {
+                Column(modifier = Modifier.fillMaxSize().padding(top = 24.dp)) {
+                    Box(modifier = Modifier.size(40.dp, 4.dp).background(Color.White.copy(alpha = 0.3f), CircleShape).align(Alignment.CenterHorizontally))
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Filter", style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { showFilters = false }) {
+                            Icon(Icons.Filled.Check, null, tint = AuraLime, modifier = Modifier.size(28.dp))
+                        }
+                    }
+                    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
+                        Spacer(Modifier.height(20.dp))
+                        FilterSection(
+                            title = "Tour",
+                            options = AiTourFilter.entries,
+                            selected = state.tourFilter,
+                            onSelect = viewModel::setTourFilter
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        FilterSection(
+                            title = "Kategorie",
+                            options = AiCategoryFilter.entries,
+                            selected = state.categoryFilter,
+                            onSelect = viewModel::setCategoryFilter
+                        )
+                    }
+                }
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize().blur(16.dp).background(Color.White.copy(alpha = 0.4f)))
     }
 }
 

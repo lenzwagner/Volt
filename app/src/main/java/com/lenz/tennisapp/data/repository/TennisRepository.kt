@@ -112,9 +112,16 @@ class TennisRepository @Inject constructor(
 
     private suspend fun getCachedPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? {
         val now = System.currentTimeMillis()
-        cachedPredictions?.let { if (now - predictionsCachedAt < PREDICTIONS_TTL_MS) return it }
+        val today = java.time.LocalDate.now().format(dateFormatter)
+        fun isFresh(cached: com.lenz.tennisapp.data.api.PredictionsResponse?): Boolean {
+            if (cached == null) return false
+            if (now - predictionsCachedAt >= PREDICTIONS_TTL_MS) return false
+            if (cached.data?.date != today) return false  // new day → invalidate
+            return true
+        }
+        cachedPredictions?.let { if (isFresh(it)) return it }
         return predictionsMutex.withLock {
-            cachedPredictions?.let { if (now - predictionsCachedAt < PREDICTIONS_TTL_MS) return it }
+            cachedPredictions?.let { if (isFresh(it)) return it }
             try {
                 rankingProxy.getPredictions().also {
                     cachedPredictions = it
