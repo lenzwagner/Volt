@@ -174,31 +174,66 @@ fun AiRecommendationsScreen(
                 return@LazyColumn
             }
 
-            // ── Top Picks label ──────────────────────────────────────────
+            // ── Top Picks carousel ───────────────────────────────────────
             if (topPicks.isNotEmpty()) {
                 item {
-                    Text(
-                        "Top Picks",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Black,
-                        color = AuraDeep,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-
-                // ── Carousel ─────────────────────────────────────────────
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(topPicks, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_top" }) { match ->
-                            TopPickCard(match, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.AutoAwesome,
+                                    null,
+                                    tint = AuraPurple,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    "Top Picks",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Black,
+                                    color = AuraDeep
+                                )
+                            }
+                            Text(
+                                "${topPicks.size} Treffer",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+
+                        Box {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(topPicks, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_top" }) { match ->
+                                    TopPickCard(match, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
+                                }
+                            }
+                            // Right edge fade
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .width(40.dp)
+                                    .height(180.dp)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color.White.copy(alpha = 0f), Color.White)
+                                        )
+                                    )
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
-
-                item { Spacer(Modifier.height(8.dp)) }
             }
 
             // ── Sort toggle (for Alle Prognosen) ────────────────────────
@@ -440,110 +475,138 @@ private fun TopPickCard(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}
     val tourLabel = enriched.tourLabel()
     val purpleAlpha = AuraPurple
 
+    val cardGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFF1A1040), AuraDeep),
+        start = androidx.compose.ui.geometry.Offset(0f, 0f),
+        end = androidx.compose.ui.geometry.Offset(600f, 400f)
+    )
+
     ElevatedCard(
         onClick = onClick,
         modifier = Modifier.width(230.dp),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent)
     ) {
-        Column(modifier = Modifier.padding(14.dp, 14.dp, 14.dp, 12.dp)) {
-
-            // Top row: category + tour badges | confidence chip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    tourLabel?.let {
-                        Surface(shape = RoundedCornerShape(6.dp), color = AuraDeep.copy(alpha = 0.08f)) {
-                            Text(it, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontSize = 9.sp, fontWeight = FontWeight.Black, color = AuraDeep)
-                        }
-                    }
-                    catLabel?.let {
-                        Surface(shape = RoundedCornerShape(6.dp), color = AuraPurple.copy(alpha = 0.08f)) {
-                            Text(it, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                fontSize = 9.sp, fontWeight = FontWeight.Black, color = AuraPurple)
-                        }
-                    }
-                }
-                Surface(shape = RoundedCornerShape(20.dp), color = conf.color.copy(alpha = 0.12f)) {
-                    Text(conf.label, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        fontSize = 9.sp, fontWeight = FontWeight.Black, color = conf.color)
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Confidence arc + face-off player names
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: P1
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        match.p1Fullname.split(" ").last(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (p1Wins) FontWeight.Black else FontWeight.Normal,
-                        color = if (p1Wins) AuraDeep else AuraDeep.copy(alpha = 0.45f),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(cardGradient)
+        ) {
+            // Subtle shimmer dot top-right
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .offset(x = 140.dp, y = (-20).dp)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(AuraPurple.copy(alpha = 0.25f), Color.Transparent)
+                        ),
+                        CircleShape
                     )
-                    Text("$p1Pct%", fontSize = 13.sp, fontWeight = FontWeight.Black,
-                        color = if (p1Wins) purpleAlpha else Color(0xFFEF4444).copy(alpha = 0.6f))
+            )
+
+            Column(modifier = Modifier.padding(14.dp, 14.dp, 14.dp, 14.dp)) {
+
+                // Top row: badges | confidence chip
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        tourLabel?.let {
+                            Surface(shape = RoundedCornerShape(6.dp), color = Color.White.copy(alpha = 0.12f)) {
+                                Text(it, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.85f))
+                            }
+                        }
+                        catLabel?.let {
+                            Surface(shape = RoundedCornerShape(6.dp), color = AuraPurple.copy(alpha = 0.35f)) {
+                                Text(it, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 9.sp, fontWeight = FontWeight.Black, color = AuraLime)
+                            }
+                        }
+                    }
+                    Surface(shape = RoundedCornerShape(20.dp), color = conf.color.copy(alpha = 0.22f)) {
+                        Text(conf.label, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize = 8.sp, fontWeight = FontWeight.Black, color = conf.color)
+                    }
                 }
 
-                // Center: circular confidence arc
-                Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val stroke = 5f
-                        val inset = stroke / 2
-                        val rect = androidx.compose.ui.geometry.Rect(
-                            offset = Offset(inset, inset),
-                            size = Size(size.width - stroke, size.height - stroke)
+                Spacer(Modifier.height(14.dp))
+
+                // Face-off + confidence arc
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    // P1
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            match.p1Fullname.split(" ").last(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (p1Wins) FontWeight.Black else FontWeight.Normal,
+                            color = if (p1Wins) Color.White else Color.White.copy(alpha = 0.4f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
-                        // Track
-                        drawArc(color = Color(0xFFE0E0E0), startAngle = 135f, sweepAngle = 270f,
-                            useCenter = false,
-                            topLeft = rect.topLeft, size = rect.size,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round))
-                        // Fill
-                        drawArc(color = conf.color, startAngle = 135f, sweepAngle = 270f * animConf,
-                            useCenter = false,
-                            topLeft = rect.topLeft, size = rect.size,
-                            style = Stroke(width = stroke, cap = StrokeCap.Round))
+                        Text(
+                            "$p1Pct%",
+                            fontSize = 14.sp, fontWeight = FontWeight.Black,
+                            color = if (p1Wins) AuraLime else Color.White.copy(alpha = 0.35f)
+                        )
                     }
-                    Text("${(match.confidence * 100).toInt()}%",
-                        fontSize = 10.sp, fontWeight = FontWeight.Black, color = conf.color)
+
+                    // Confidence arc
+                    Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val stroke = 5f
+                            val inset = stroke / 2
+                            val rect = androidx.compose.ui.geometry.Rect(
+                                offset = Offset(inset, inset),
+                                size = Size(size.width - stroke, size.height - stroke)
+                            )
+                            drawArc(color = Color.White.copy(alpha = 0.12f), startAngle = 135f, sweepAngle = 270f,
+                                useCenter = false, topLeft = rect.topLeft, size = rect.size,
+                                style = Stroke(width = stroke, cap = StrokeCap.Round))
+                            drawArc(color = conf.color, startAngle = 135f, sweepAngle = 270f * animConf,
+                                useCenter = false, topLeft = rect.topLeft, size = rect.size,
+                                style = Stroke(width = stroke, cap = StrokeCap.Round))
+                        }
+                        Text("${(match.confidence * 100).toInt()}%",
+                            fontSize = 10.sp, fontWeight = FontWeight.Black, color = conf.color)
+                    }
+
+                    // P2
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Text(
+                            match.p2Fullname.split(" ").last(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (!p1Wins) FontWeight.Black else FontWeight.Normal,
+                            color = if (!p1Wins) Color.White else Color.White.copy(alpha = 0.4f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.End
+                        )
+                        Text(
+                            "$p2Pct%",
+                            fontSize = 14.sp, fontWeight = FontWeight.Black,
+                            color = if (!p1Wins) AuraLime else Color.White.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End
+                        )
+                    }
                 }
 
-                // Right: P2
-                Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text(
-                        match.p2Fullname.split(" ").last(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (!p1Wins) FontWeight.Black else FontWeight.Normal,
-                        color = if (!p1Wins) AuraDeep else AuraDeep.copy(alpha = 0.45f),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.End
+                Spacer(Modifier.height(12.dp))
+
+                // Probability bar
+                Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.1f))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(animP1).fillMaxHeight()
+                            .background(
+                                Brush.horizontalGradient(listOf(AuraLime, AuraPurple)),
+                                RoundedCornerShape(3.dp)
+                            )
                     )
-                    Text("$p2Pct%", fontSize = 13.sp, fontWeight = FontWeight.Black,
-                        color = if (!p1Wins) purpleAlpha else Color(0xFFEF4444).copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
                 }
-            }
-
-            Spacer(Modifier.height(10.dp))
-
-            // Probability split bar
-            Box(modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFFEF4444).copy(alpha = 0.18f))
-            ) {
-                Box(modifier = Modifier.fillMaxWidth(animP1).fillMaxHeight()
-                    .background(Brush.horizontalGradient(listOf(AuraPurple, AuraPurple.copy(alpha = 0.65f))),
-                        RoundedCornerShape(3.dp)))
             }
         }
     }
