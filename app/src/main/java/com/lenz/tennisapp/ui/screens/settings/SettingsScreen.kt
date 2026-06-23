@@ -143,21 +143,6 @@ private fun ApiSettingsBox(
                         onTest = { viewModel.testTennisKey(it) }
                     )
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // Odds API Section
-                    ApiKeySection(
-                        title = "The Odds API",
-                        subtitle = "the-odds-api.com",
-                        currentKey = state.oddsKey,
-                        isExpired = state.oddsKeyExpired,
-                        statusText = if (state.oddsKeyExpired) "Limit erreicht" else "${state.oddsRequestsRemaining} Anfragen übrig",
-                        isTesting = state.isTestingOdds,
-                        testResult = state.oddsTestResult,
-                        signupUrl = "https://the-odds-api.com",
-                        onSave = viewModel::saveOddsKey,
-                        onTest = { viewModel.testOddsKey(it) }
-                    )
                 }
             }
         }

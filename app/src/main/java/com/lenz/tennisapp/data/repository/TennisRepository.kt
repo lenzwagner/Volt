@@ -1,7 +1,8 @@
 package com.lenz.tennisapp.data.repository
 
-import com.lenz.tennisapp.data.api.OddsApiService
+import com.lenz.tennisapp.data.api.OddsBlazService
 import com.lenz.tennisapp.data.api.RankingProxyService
+import com.lenz.tennisapp.data.api.dto.americanToDecimal
 import com.lenz.tennisapp.data.api.TennisApiService
 import com.lenz.tennisapp.data.api.dto.*
 import com.lenz.tennisapp.data.datastore.ApiKeyStore
@@ -39,7 +40,7 @@ import javax.inject.Singleton
 class TennisRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tennisApi: TennisApiService,
-    private val oddsApi: OddsApiService,
+    private val oddsBlaz: OddsBlazService,
     private val rankingProxy: RankingProxyService,
     private val matchDao: MatchDao,
     private val eloDao: EloDao,
@@ -167,27 +168,12 @@ class TennisRepository @Inject constructor(
         }
     }
 
-    // Sport keys cached per day — 1 getSports call/day, getOdds only per match on-demand
-    private var cachedTennisSports: List<String> = emptyList()
-    private var tennisSportsCachedDay: LocalDate? = null
-    private var cachedOddsApiKey: String = ""
-
-    private suspend fun getTennisSportKeys(apiKey: String): List<String> {
-        val today = LocalDate.now()
-        if (tennisSportsCachedDay == today && cachedTennisSports.isNotEmpty() && cachedOddsApiKey == apiKey) {
-            return cachedTennisSports
-        }
-        return try {
-            val sports = oddsApi.getSports(apiKey = apiKey)
-                .filter { it.key.startsWith("tennis_") }
-                .map { it.key }
-            cachedTennisSports = sports
-            tennisSportsCachedDay = today
-            cachedOddsApiKey = apiKey
-            sports
-        } catch (e: Exception) {
-            Timber.w("getSports failed: ${e.message}")
-            emptyList()
+    private fun oddsBlazLeaguesFor(eventType: String): List<String> {
+        val et = eventType.lowercase()
+        return when {
+            et.contains("wta") || et.contains("women") -> listOf("wta")
+            et.contains("challenger") -> listOf("challenger", "atp")
+            else -> listOf("atp", "challenger")
         }
     }
 
@@ -1058,22 +1044,18 @@ class TennisRepository @Inject constructor(
     }
 
     suspend fun syncOddsForAllMatches() {
-        val apiKey = keyStore.oddsApiKey.first().takeIf { it.isNotBlank() } ?: return
-        if (keyStore.oddsKeyExpired.first()) return
-
         val today = LocalDate.now().format(dateFormatter)
         val matches = matchDao.getOpenMatchesForDate(today)
         if (matches.isEmpty()) return
 
-        val sportKeys = getTennisSportKeys(apiKey)
-        if (sportKeys.isEmpty()) {
-            Timber.w("No tennis sport keys available — skipping sync")
-            return
-        }
-        val allEvents = mutableListOf<com.lenz.tennisapp.data.api.dto.OddsEventDto>()
-        for (sport in sportKeys) {
-            try { allEvents += oddsApi.getOdds(sport = sport, apiKey = apiKey) }
-            catch (e: Exception) { Timber.w("Failed $sport: ${e.message}") }
+        // Fetch all three leagues once
+        val eventsByLeague = mutableMapOf<String, List<com.lenz.tennisapp.data.api.dto.OddsBlazEvent>>()
+        for (league in listOf("atp", "wta", "challenger")) {
+            try {
+                eventsByLeague[league] = oddsBlaz.getOdds(league = league).events
+            } catch (e: Exception) {
+                Timber.w("OddsBlaz fetch failed for $league: ${e.message}")
+            }
         }
 
         val now = System.currentTimeMillis()
@@ -1081,39 +1063,32 @@ class TennisRepository @Inject constructor(
         for (entity in matches) {
             val p1Search = getBestNamePart(entity.homePlayer)
             val p2Search = getBestNamePart(entity.awayPlayer)
+            val leagues = oddsBlazLeaguesFor(entity.eventType ?: "")
+            val allEvents = leagues.flatMap { eventsByLeague[it] ?: emptyList() }
 
             val event = allEvents.firstOrNull { e ->
-                val ht = e.homeTeam.lowercase(); val at = e.awayTeam.lowercase()
-                (ht.contains(p1Search) && at.contains(p2Search)) ||
-                (ht.contains(p2Search) && at.contains(p1Search))
+                val hn = e.teams.home.name.lowercase(); val an = e.teams.away.name.lowercase()
+                (hn.contains(p1Search) && an.contains(p2Search)) ||
+                (hn.contains(p2Search) && an.contains(p1Search))
             } ?: continue
 
-            val isSwapped = event.homeTeam.lowercase().contains(p2Search)
-
-            // Keep top bookmakers
-            val topBookies = listOf("tipico", "pinnacle", "bet365", "bwin", "betfair", "betway", "williamhill", "unibet")
-            val results = event.bookmakers
-                .filter { bm -> 
-                    topBookies.any { bm.key.contains(it) || bm.title.lowercase().contains(it) } 
-                }
-                .take(3) 
-                .mapNotNull { bm ->
-                    val h2h = bm.markets.firstOrNull { it.key == "h2h" } ?: return@mapNotNull null
-                    val o1 = h2h.outcomes.find { it.name.lowercase().contains(p1Search) }?.price
-                    val o2 = h2h.outcomes.find { it.name.lowercase().contains(p2Search) }?.price
-                    if (o1 != null && o2 != null) BookmakerOdds(
-                        bookmakerName = bm.title,
-                        homeOdds = if (isSwapped) o2 else o1,
-                        awayOdds = if (isSwapped) o1 else o2
-                    ) else null
-                }
-
-            if (results.isNotEmpty()) {
-                matchDao.updateOdds(entity.id, oddsAdapter.toJson(results), now)
+            val isSwapped = event.teams.home.name.lowercase().contains(p2Search)
+            val moneyline = event.odds.filter { it.market == "Moneyline" && it.main }
+            val o1 = moneyline.find { it.name.lowercase().contains(p1Search) }
+            val o2 = moneyline.find { it.name.lowercase().contains(p2Search) }
+            if (o1 != null && o2 != null) {
+                val odds = listOf(
+                    BookmakerOdds(
+                        bookmakerName = "DraftKings",
+                        homeOdds = americanToDecimal(if (isSwapped) o2.price else o1.price),
+                        awayOdds = americanToDecimal(if (isSwapped) o1.price else o2.price)
+                    )
+                )
+                matchDao.updateOdds(entity.id, oddsAdapter.toJson(odds), now)
                 updatedCount++
             }
         }
-        Timber.d("OddsSync: updated $updatedCount matches out of ${matches.size} open matches")
+        Timber.d("OddsBlaz sync: updated $updatedCount / ${matches.size}")
     }
 
     private suspend fun loadOrFetchOdds(
@@ -1138,62 +1113,41 @@ class TennisRepository @Inject constructor(
 
     private suspend fun fetchOddsForMatch(match: TennisMatch): List<BookmakerOdds> {
         return try {
-            val apiKey = keyStore.oddsApiKey.first().takeIf { it.isNotBlank() } ?: return emptyList()
-            val expired = keyStore.oddsKeyExpired.first()
-            if (expired) return emptyList()
-
-            val eventType = match.eventType.lowercase()
-            
-            // The Odds API only supports ATP, WTA and ATP Challenger.
-            // If it's ITF or other, it will likely 404 or return nothing.
-            if (eventType.contains("itf") || eventType.contains("exhibition")) {
-                return emptyList()
-            }
-
-            val sportKeys = getTennisSportKeys(apiKey)
-            if (sportKeys.isEmpty()) {
-                Timber.w("No tennis sport keys available")
-                return emptyList()
-            }
-
             val p1Search = getBestNamePart(match.homePlayer.name)
             val p2Search = getBestNamePart(match.awayPlayer.name)
-            Timber.d("Fetching odds for $p1Search vs $p2Search")
+            Timber.d("OddsBlaz: fetching for $p1Search vs $p2Search")
 
-            // Loop sport keys, stop as soon as match found — only 1-2 getOdds calls per match
-            for (sport in sportKeys) {
-                try {
-                    val events = oddsApi.getOdds(sport = sport, apiKey = apiKey)
-                    val event = events.firstOrNull { e ->
-                        val ht = e.homeTeam.lowercase(); val at = e.awayTeam.lowercase()
-                        val found = (ht.contains(p1Search) && at.contains(p2Search)) ||
-                                    (ht.contains(p2Search) && at.contains(p1Search))
-                        if (found) Timber.d("Match found in $sport: ${e.homeTeam} vs ${e.awayTeam}")
-                        found
-                    } ?: continue
+            for (league in oddsBlazLeaguesFor(match.eventType)) {
+                val events = try {
+                    oddsBlaz.getOdds(league = league).events
+                } catch (e: Exception) {
+                    Timber.w("OddsBlaz league=$league failed: ${e.message}")
+                    continue
+                }
+                val event = events.firstOrNull { e ->
+                    val hn = e.teams.home.name.lowercase(); val an = e.teams.away.name.lowercase()
+                    (hn.contains(p1Search) && an.contains(p2Search)) ||
+                    (hn.contains(p2Search) && an.contains(p1Search))
+                } ?: continue
 
-                    val isSwapped = event.homeTeam.lowercase().contains(p2Search)
-                    val results = event.bookmakers
-                        .filter { bm -> bm.key == "tipico_de" || bm.title.lowercase().contains("tipico") }
-                        .mapNotNull { bm ->
-                            val h2h = bm.markets.firstOrNull { it.key == "h2h" } ?: return@mapNotNull null
-                            val o1 = h2h.outcomes.find { it.name.lowercase().contains(p1Search) }?.price
-                            val o2 = h2h.outcomes.find { it.name.lowercase().contains(p2Search) }?.price
-                            if (o1 != null && o2 != null) BookmakerOdds(
-                                bookmakerName = bm.title,
-                                homeOdds = if (isSwapped) o2 else o1,
-                                awayOdds = if (isSwapped) o1 else o2
-                            ) else null
-                        }
-                    Timber.d("Odds found: ${results.size}")
-                    return results
-                } catch (e: retrofit2.HttpException) {
-                    if (e.code() == 404) continue else throw e
+                val isSwapped = event.teams.home.name.lowercase().contains(p2Search)
+                val moneyline = event.odds.filter { it.market == "Moneyline" && it.main }
+                val o1 = moneyline.find { it.name.lowercase().contains(p1Search) }
+                val o2 = moneyline.find { it.name.lowercase().contains(p2Search) }
+                if (o1 != null && o2 != null) {
+                    Timber.d("OddsBlaz: found ${event.teams.home.name} vs ${event.teams.away.name} in $league")
+                    return listOf(
+                        BookmakerOdds(
+                            bookmakerName = "DraftKings",
+                            homeOdds = americanToDecimal(if (isSwapped) o2.price else o1.price),
+                            awayOdds = americanToDecimal(if (isSwapped) o1.price else o2.price)
+                        )
+                    )
                 }
             }
             emptyList()
         } catch (e: Exception) {
-            Timber.w(e, "Odds fetch failed")
+            Timber.w(e, "OddsBlaz fetch failed")
             emptyList()
         }
     }

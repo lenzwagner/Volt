@@ -17,6 +17,13 @@ val keystoreProps = Properties().apply {
 fun signingValue(envKey: String, propKey: String): String? =
     System.getenv(envKey) ?: keystoreProps.getProperty(propKey)
 
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+fun localOrEnv(propKey: String, envKey: String = propKey): String =
+    System.getenv(envKey) ?: localProps.getProperty(propKey) ?: ""
+
 android {
     namespace = "com.lenz.tennisapp"
     compileSdk = 35
@@ -25,8 +32,9 @@ android {
         applicationId = "com.lenz.tennisapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 49
-        versionName = "5.8"
+        versionCode = 50
+        versionName = "5.9"
+        buildConfigField("String", "ODDSBLAZ_KEY", "\"${localOrEnv("ODDSBLAZ_KEY")}\"")
     }
 
     signingConfigs {

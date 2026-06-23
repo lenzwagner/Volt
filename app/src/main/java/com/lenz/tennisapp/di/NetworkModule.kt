@@ -1,8 +1,6 @@
 package com.lenz.tennisapp.di
 
-import com.lenz.tennisapp.data.api.OddsApiService
 import com.lenz.tennisapp.data.api.TennisApiService
-import com.lenz.tennisapp.data.api.interceptor.OddsApiKeyInterceptor
 import com.lenz.tennisapp.data.api.interceptor.TennisApiKeyInterceptor
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -52,12 +50,6 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("odds")
-    fun provideOddsOkHttp(interceptor: OddsApiKeyInterceptor): OkHttpClient =
-        baseOkHttp().addInterceptor(interceptor).build()
-
-    @Provides
-    @Singleton
     fun provideTennisApiService(
         @Named("tennis") client: OkHttpClient,
         moshi: Moshi
@@ -88,13 +80,10 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOddsApiService(
-        @Named("odds") client: OkHttpClient,
-        moshi: Moshi
-    ): OddsApiService = Retrofit.Builder()
-        .baseUrl("https://api.the-odds-api.com/v4/")
-        .client(client)
+    fun provideOddsBlazService(moshi: Moshi): com.lenz.tennisapp.data.api.OddsBlazService = Retrofit.Builder()
+        .baseUrl("https://odds.oddsblaze.com/")
+        .client(baseOkHttp().build())
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
-        .create(OddsApiService::class.java)
+        .create(com.lenz.tennisapp.data.api.OddsBlazService::class.java)
 }

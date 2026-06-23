@@ -25,25 +25,3 @@ class TennisApiKeyInterceptor @Inject constructor(
     }
 }
 
-@Singleton
-class OddsApiKeyInterceptor @Inject constructor(
-    private val keyStore: ApiKeyStore
-) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): Response {
-        val response = chain.proceed(chain.request())
-
-        when (response.code) {
-            401 -> runBlocking { keyStore.setOddsKeyExpired(true) }
-            429 -> runBlocking { keyStore.setOddsKeyExpired(true) }
-        }
-
-        // Track remaining requests from header
-        response.header("x-requests-remaining")?.toIntOrNull()?.let { remaining ->
-            runBlocking { keyStore.setOddsRequestsRemaining(remaining) }
-            if (remaining == 0) {
-                runBlocking { keyStore.setOddsKeyExpired(true) }
-            }
-        }
-        return response
-    }
-}

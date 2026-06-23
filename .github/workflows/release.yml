@@ -33,6 +33,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          ODDSBLAZ_KEY: ${{ secrets.ODDSBLAZ_KEY }}
         run: ./gradlew :app:assembleRelease --no-daemon
 
       - name: Rename APK
