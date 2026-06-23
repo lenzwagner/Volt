@@ -153,18 +153,47 @@ class TennisRepository @Inject constructor(
         fun isFresh(cached: com.lenz.tennisapp.data.api.PredictionsResponse?): Boolean {
             if (cached == null) return false
             if (now - predictionsCachedAt >= PREDICTIONS_TTL_MS) return false
-            if (cached.data?.date != today) return false  // new day → invalidate
+            if (cached.data?.date != today) return false
             return true
         }
+        // L1: in-memory (15min TTL)
         cachedPredictions?.let { if (isFresh(it)) return it }
         return predictionsMutex.withLock {
             cachedPredictions?.let { if (isFresh(it)) return it }
-            try {
-                rankingProxy.getPredictions().also {
-                    cachedPredictions = it
-                    predictionsCachedAt = System.currentTimeMillis()
+            // L2: DataStore (day-based, survives app restart)
+            val storedDate = keyStore.predictionsDate.first()
+            if (storedDate == today) {
+                val storedJson = keyStore.predictionsJson.first()
+                if (storedJson.isNotBlank()) {
+                    runCatching {
+                        val adapter = moshi.adapter(com.lenz.tennisapp.data.api.PredictionsResponse::class.java)
+                        adapter.fromJson(storedJson)
+                    }.getOrNull()?.also {
+                        cachedPredictions = it
+                        predictionsCachedAt = now
+                        Timber.d("Predictions loaded from DataStore cache")
+                        return it
+                    }
                 }
-            } catch (e: Exception) { Timber.w(e, "Predictions fetch failed"); null }
+            }
+            // L3: network
+            try {
+                rankingProxy.getPredictions().also { resp ->
+                    cachedPredictions = resp
+                    predictionsCachedAt = System.currentTimeMillis()
+                    val date = resp?.data?.date ?: today
+                    val adapter = moshi.adapter(com.lenz.tennisapp.data.api.PredictionsResponse::class.java)
+                    val json = runCatching { adapter.toJson(resp) }.getOrNull() ?: ""
+                    if (json.isNotBlank()) {
+                        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            keyStore.savePredictions(json, date)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Predictions fetch failed")
+                null
+            }
         }
     }
 
