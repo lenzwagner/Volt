@@ -86,10 +86,6 @@ fun SettingsScreen(
 
                 item { OddsSyncCard() }
 
-                item { SectionLabel("Upcoming Features") }
-
-                item { UpcomingFeaturesCard() }
-
                 item { SectionLabel("Info") }
 
                 item { InfoCard() }
@@ -317,7 +313,7 @@ private fun ExpandableUISettingsCard() {
         // App-Menüs Section
         UIAdaptationBox(
             title = "App-Menüs",
-            subtitle = "Home, Live, Heute, Prognosen",
+            subtitle = "Heute, Vorhersagen, KI-Tipps, Mehr",
             isExpanded = expandedMenu,
             onExpandChange = { 
                 expandedMenu = it
@@ -662,7 +658,7 @@ private fun UpcomingFeaturesCard() {
 private fun InfoCard() {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Tennis Today v1.0.0", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+            Text("Tennis Today v4.7", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
             Text("Daten von api-tennis.com & tennisabstract.com", style = MaterialTheme.typography.bodySmall)
         }
     }
