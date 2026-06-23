@@ -99,11 +99,16 @@ class MatchDetailViewModel @Inject constructor(
             if (isSilent && current is MatchDetailUiState.Loaded) {
                 val fresh = repository.getFreshMatch(matchId)
                 if (fresh != null) {
-                    // Keep enriched players; only update score/status/game fields.
+                    // Keep enriched players; only update score/game fields.
+                    // Don't trust fresh.status blindly: an isLive = 0 glitch from the
+                    // API would set status = NOT_STARTED and hide the live score. Only
+                    // apply a new status when the match genuinely finishes.
+                    val safeStatus = if (fresh.status == MatchStatus.FINISHED) fresh.status
+                                     else current.detail.match.status
                     val merged = current.detail.match.copy(
                         score = fresh.score,
                         gameScore = fresh.gameScore,
-                        status = fresh.status,
+                        status = safeStatus,
                         isHomeServing = fresh.isHomeServing,
                         setScores = fresh.setScores,
                         finalResult = fresh.finalResult,
@@ -137,10 +142,12 @@ class MatchDetailViewModel @Inject constructor(
                     // but refreshSilent may have updated it since then.
                     val fresh = repository.getFreshMatch(matchId)
                     val detail = if (fresh != null) {
+                        val safeStatus = if (fresh.status == MatchStatus.FINISHED) fresh.status
+                                         else result.data.match.status
                         result.data.copy(match = result.data.match.copy(
                             score = fresh.score,
                             gameScore = fresh.gameScore,
-                            status = fresh.status,
+                            status = safeStatus,
                             isHomeServing = fresh.isHomeServing,
                             setScores = fresh.setScores,
                             finalResult = fresh.finalResult,

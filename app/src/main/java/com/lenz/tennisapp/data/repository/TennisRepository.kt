@@ -271,9 +271,10 @@ class TennisRepository @Inject constructor(
                 val entities = response.result.mapNotNull { it.toEntity() }
                 upsertMatchesPreservingOdds(entities)
                 val liveIds = entities.map { it.id }
-                if (liveIds.isEmpty()) {
-                    matchDao.resetStaleLive(listOf("__none__"))
-                } else {
+                // Only reset stale-live flags when API confirms at least one live match.
+                // An empty result may be a transient API glitch — resetting here would set
+                // isLive = 0 for every match and cause status to flip to NOT_STARTED.
+                if (liveIds.isNotEmpty()) {
                     matchDao.resetStaleLive(liveIds)
                 }
             }
