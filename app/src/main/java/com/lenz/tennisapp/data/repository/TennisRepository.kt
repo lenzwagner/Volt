@@ -776,14 +776,16 @@ class TennisRepository @Inject constructor(
             }
             val h2hDeferred = async {
                 try {
-                    rankingProxy.getH2H(
-                        p1 = match.homePlayer.name,
-                        p2 = match.awayPlayer.name,
-                        date = match.date.take(10),
-                        tour = tourType
-                    )
+                    kotlinx.coroutines.withTimeout(7_000) {
+                        rankingProxy.getH2H(
+                            p1 = match.homePlayer.name,
+                            p2 = match.awayPlayer.name,
+                            date = match.date.take(10),
+                            tour = tourType
+                        )
+                    }
                 } catch (e: Exception) {
-                    Timber.w(e, "H2H proxy fetch failed")
+                    Timber.w(e, "H2H proxy fetch failed: ${e.message}")
                     null
                 }
             }

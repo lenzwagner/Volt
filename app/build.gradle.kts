@@ -25,8 +25,8 @@ android {
         applicationId = "com.lenz.tennisapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 47
-        versionName = "5.6"
+        versionCode = 48
+        versionName = "5.7"
     }
 
     signingConfigs {
