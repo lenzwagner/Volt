@@ -343,7 +343,9 @@ private fun MatchHeader(
                 onBack = onBack,
                 onRefresh = onRefresh
             )
-            ScoreHeaderContent(match = match, onPlayerClick = onPlayerClick)
+            key(match.score, match.gameScore, match.status) {
+                ScoreHeaderContent(match = match, onPlayerClick = onPlayerClick)
+            }
         }
     }
 }
@@ -393,11 +395,12 @@ private fun TopBarContent(
 
 @Composable
 private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, String) -> Unit) {
-    val hasScoreData = !match.score.isNullOrBlank() && match.score != "-" &&
+    val scoreToUse = match.score ?: match.finalResult
+    val hasScoreData = !scoreToUse.isNullOrBlank() && scoreToUse != "-" &&
         match.status != MatchStatus.NOT_STARTED && match.status != MatchStatus.TBD
     val isInPlay = match.status == MatchStatus.LIVE ||
         (hasScoreData && match.status != MatchStatus.FINISHED)
-    val scoreParts = match.score?.takeIf { it.isNotBlank() && it != "-" }?.split(",") ?: emptyList()
+    val scoreParts = scoreToUse?.takeIf { it.isNotBlank() && it != "-" }?.split(",") ?: emptyList()
 
     fun extractTb(raw: String): Int? {
         val start = raw.indexOf('('); val end = raw.indexOf(')')

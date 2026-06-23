@@ -475,23 +475,16 @@ private fun TopPickCard(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}
     val tourLabel = enriched.tourLabel()
     val purpleAlpha = AuraPurple
 
-    val cardGradient = Brush.linearGradient(
-        colors = listOf(Color(0xFF1A1040), AuraDeep),
-        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-        end = androidx.compose.ui.geometry.Offset(600f, 400f)
-    )
-
     ElevatedCard(
         onClick = onClick,
         modifier = Modifier.width(230.dp),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent)
+        colors = CardDefaults.elevatedCardColors(containerColor = AuraDeep)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(cardGradient)
         ) {
             // Subtle shimmer dot top-right
             Box(
