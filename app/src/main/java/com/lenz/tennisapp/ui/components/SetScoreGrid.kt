@@ -88,7 +88,6 @@ fun SetScoreGrid(
     ) {
         // Home player row
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             displaySets.forEachIndexed { i, (homeStr, awayStr) ->
@@ -103,22 +102,27 @@ fun SetScoreGrid(
                     isCurrent = isCurrentSet,
                     fontSize  = fontSize
                 )
+                
+                if (i < displaySets.size - 1) {
+                    Spacer(Modifier.width(6.dp))
+                }
             }
             if (showGame) {
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "|",
                     fontSize = gameSize,
                     color = AuraDeep.copy(alpha = 0.25f),
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(horizontal = 2.dp)
+                    fontWeight = FontWeight.Light
                 )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = gHome ?: "0",
                     fontSize = gameSize,
                     color = Color(0xFFE53935),
                     fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(28.dp)
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.requiredWidth(28.dp)
                 )
             }
         }
@@ -127,7 +131,6 @@ fun SetScoreGrid(
 
         // Away player row
         Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             displaySets.forEachIndexed { i, (homeStr, awayStr) ->
@@ -142,22 +145,27 @@ fun SetScoreGrid(
                     isCurrent = isCurrentSet,
                     fontSize  = fontSize
                 )
+
+                if (i < displaySets.size - 1) {
+                    Spacer(Modifier.width(6.dp))
+                }
             }
             if (showGame) {
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "|",
                     fontSize = gameSize,
                     color = AuraDeep.copy(alpha = 0.25f),
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(horizontal = 2.dp)
+                    fontWeight = FontWeight.Light
                 )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = gAway ?: "0",
                     fontSize = gameSize,
                     color = Color(0xFFE53935),
                     fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(28.dp)
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.requiredWidth(28.dp)
                 )
             }
         }
@@ -201,7 +209,7 @@ private fun SetDigit(
     }
 
     Row(
-        modifier = Modifier.widthIn(min = 18.dp).scale(scale),
+        modifier = Modifier.requiredWidth(24.dp).scale(scale),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.Center
     ) {

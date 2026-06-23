@@ -56,14 +56,14 @@ class MatchDetailViewModel @Inject constructor(
 
     fun loadDetail() {
         viewModelScope.launch {
-            fetchDetail(isSilent = false, forceRefreshOdds = false)
+            fetchDetail(isSilent = false, forceRefreshOdds = false, showIndicator = false)
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
             Timber.d("Manual refresh triggered for match $matchId")
-            fetchDetail(isSilent = false, forceRefreshOdds = true)
+            fetchDetail(isSilent = false, forceRefreshOdds = true, showIndicator = true)
         }
     }
 
@@ -87,9 +87,9 @@ class MatchDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchDetail(isSilent: Boolean, forceRefreshOdds: Boolean = false) {
+    private suspend fun fetchDetail(isSilent: Boolean, forceRefreshOdds: Boolean = false, showIndicator: Boolean = false) {
         try {
-            if (!isSilent) _isRefreshing.value = true
+            if (showIndicator) _isRefreshing.value = true
             Timber.d("Loading match detail for ID: $matchId (silent=$isSilent, forceOdds=$forceRefreshOdds)")
             val predMap = predictionRepository.getPredictionMap().first()
 
@@ -151,11 +151,11 @@ class MatchDetailViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "Exception in fetchDetail")
-            if (!isSilent) {
+            if (!isSilent && _uiState.value !is MatchDetailUiState.Loaded) {
                 _uiState.value = MatchDetailUiState.Error("Fehler: ${e.message}")
             }
         } finally {
-            if (!isSilent) _isRefreshing.value = false
+            if (showIndicator) _isRefreshing.value = false
         }
     }
 

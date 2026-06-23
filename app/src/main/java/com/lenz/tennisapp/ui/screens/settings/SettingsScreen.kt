@@ -7,11 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.lenz.tennisapp.ui.components.GreenHeader
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
@@ -26,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -34,17 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkManager
-import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.os.Process
 import com.lenz.tennisapp.worker.RankingsAndEloSyncWorker
 import com.lenz.tennisapp.ui.theme.AuraPurple
 import com.lenz.tennisapp.ui.theme.AuraDeep
-import java.text.SimpleDateFormat
-import java.util.Date
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.horizontalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,10 +64,6 @@ fun SettingsScreen(
                 item {
                     ApiSettingsBox(state = state, viewModel = viewModel)
                 }
-
-                item { SectionLabel("UI Anpassungen") }
-
-                item { ExpandableUISettingsCard() }
 
                 item { SectionLabel("Daten") }
 
@@ -298,185 +283,6 @@ private fun StatusChip(text: String, isActive: Boolean, isExpired: Boolean) {
         border = BorderStroke(1.dp, color.copy(alpha = 0.5f))
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-    }
-}
-
-@Composable
-private fun ExpandableUISettingsCard() {
-    var expandedMenu by remember { mutableStateOf(false) }
-    var expandedGameView by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // App-Menüs Section
-        UIAdaptationBox(
-            title = "App-Menüs",
-            subtitle = "Heute, Vorhersagen, KI-Tipps, Mehr",
-            isExpanded = expandedMenu,
-            onExpandChange = { 
-                expandedMenu = it
-                if (it) expandedGameView = false
-            },
-            content = { UISettingsPanel(sectionType = "menu") }
-        )
-
-        // Spiel Ansicht Section
-        UIAdaptationBox(
-            title = "Spiel Ansicht",
-            subtitle = "Match Details & Spieler Profile",
-            isExpanded = expandedGameView,
-            onExpandChange = { 
-                expandedGameView = it
-                if (it) expandedMenu = false
-            },
-            content = { UISettingsPanel(sectionType = "game") }
-        )
-    }
-}
-
-@Composable
-private fun UIAdaptationBox(
-    title: String,
-    subtitle: String,
-    isExpanded: Boolean,
-    onExpandChange: (Boolean) -> Unit,
-    content: @Composable () -> Unit
-) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onExpandChange(!isExpanded) }
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Icon(
-                    if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Spacer(Modifier.height(16.dp))
-                    content()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UISettingsPanel(sectionType: String) {
-    val context = LocalContext.current
-    val sharedPrefs = remember { context.getSharedPreferences("TennisAppSettings", Context.MODE_PRIVATE) }
-    var blurRadius by remember { mutableStateOf(sharedPrefs.getFloat("blur_radius", 20f)) }
-    var gradientIntensity by remember { mutableStateOf(sharedPrefs.getFloat("gradient_intensity", 0.6f)) }
-    var gradientHeight by remember { mutableStateOf(sharedPrefs.getFloat("gradient_height", 0.25f)) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        SliderWithDescription(
-            title = "Header-Unschärfe",
-            description = "Stärke des Weichzeichners auf dem Hintergrundbild.",
-            value = blurRadius,
-            onValueChange = { blurRadius = it },
-            valueRange = 0f..40f,
-            steps = 7,
-            minLabel = "Klar",
-            maxLabel = "Verschwommen"
-        )
-        SliderWithDescription(
-            title = "Overlay-Dunkelheit",
-            description = "Deckkraft des dunklen Filters für bessere Lesbarkeit.",
-            value = gradientIntensity,
-            onValueChange = { gradientIntensity = it },
-            valueRange = 0.2f..0.8f,
-            steps = 5,
-            minLabel = "Hell",
-            maxLabel = "Dunkel"
-        )
-        SliderWithDescription(
-            title = "Overlay-Abdeckung",
-            description = "Wie weit der Filter von oben in das Bild hineinragt.",
-            value = gradientHeight,
-            onValueChange = { gradientHeight = it },
-            valueRange = 0.05f..0.5f,
-            steps = 9,
-            minLabel = "Gering",
-            maxLabel = "Mittel"
-        )
-        
-        Button(
-            onClick = {
-                sharedPrefs.edit().apply {
-                    putFloat("blur_radius", blurRadius)
-                    putFloat("gradient_intensity", gradientIntensity)
-                    putFloat("gradient_height", gradientHeight)
-                    apply()
-                }
-                android.widget.Toast.makeText(context, "Gespeichert! Neustart...", android.widget.Toast.LENGTH_SHORT).show()
-                Handler(Looper.getMainLooper()).postDelayed({ Process.killProcess(Process.myPid()) }, 500)
-            },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AuraDeep,
-                contentColor = Color.White
-            )
-        ) {
-            Icon(Icons.Default.Save, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Speichern & Neustarten", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun SliderWithDescription(
-    title: String,
-    description: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    minLabel: String,
-    maxLabel: String
-) {
-    Column {
-        Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(minLabel, style = MaterialTheme.typography.labelSmall)
-            Slider(
-                value = value, 
-                onValueChange = onValueChange, 
-                valueRange = valueRange, 
-                steps = steps, 
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = AuraPurple,
-                    activeTrackColor = AuraPurple
-                )
-            )
-            Text(maxLabel, style = MaterialTheme.typography.labelSmall)
-        }
-        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
