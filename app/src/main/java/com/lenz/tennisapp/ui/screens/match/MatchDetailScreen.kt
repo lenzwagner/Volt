@@ -1033,21 +1033,33 @@ private fun FormSection(
             textAlign = TextAlign.Center
         )
     } else {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // Y-axis labels
-            Column(
-                modifier = Modifier.width(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-                horizontalAlignment = Alignment.End
+        listOf(p1 to p1Form, p2 to p2Form).forEach { (player, form) ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("G", fontSize = 9.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(24.dp))
-                Text("V", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                Text(
+                    player.name.split(" ").last(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AuraDeep,
+                    modifier = Modifier.width(72.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                // Y-axis labels
+                Column(
+                    modifier = Modifier.width(14.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text("G", fontSize = 8.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(24.dp))
+                    Text("V", fontSize = 8.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(4.dp))
+                FormGraph(form = form, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.width(6.dp))
-            FormGraph(form = p1Form, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(16.dp))
-            FormGraph(form = p2Form, modifier = Modifier.weight(1f))
         }
     }
 }
