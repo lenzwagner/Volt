@@ -79,16 +79,21 @@ class HomeViewModel @Inject constructor(
         } else {
             var filtered = filterTournaments(tournaments ?: emptyList(), tour, format, category)
 
-            if (liveOnly) {
-                filtered = filtered.map { t ->
-                    t.copy(matches = t.matches.filter { it.status == MatchStatus.LIVE })
-                }.filter { it.matches.isNotEmpty() }
-            }
-
             if (finishedOnly) {
+                // FT view: only finished matches
                 filtered = filtered.map { t ->
                     t.copy(matches = t.matches.filter { it.status == MatchStatus.FINISHED })
                 }.filter { it.matches.isNotEmpty() }
+            } else {
+                // Main view: live + open only (no finished)
+                filtered = filtered.map { t ->
+                    t.copy(matches = t.matches.filter { it.status != MatchStatus.FINISHED })
+                }.filter { it.matches.isNotEmpty() }
+                if (liveOnly) {
+                    filtered = filtered.map { t ->
+                        t.copy(matches = t.matches.filter { it.status == MatchStatus.LIVE })
+                    }.filter { it.matches.isNotEmpty() }
+                }
             }
 
             if (filtered.isNotEmpty() || networkDone) {
