@@ -94,7 +94,10 @@ fun HomeScreen(
         } else {
             if (tournaments.isEmpty() && !state.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Keine Matches gefunden", color = Color.Gray)
+                    Text(
+                        if (finishedFilter) "Keine beendeten Spiele" else "Keine Matches gefunden",
+                        color = Color.Gray
+                    )
                 }
             } else {
                 // Ensure new tournaments are expanded by default
