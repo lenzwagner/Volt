@@ -67,9 +67,9 @@ class AiRecommendationsViewModel @Inject constructor(
 
     fun findAndNavigate(p1: String, p2: String, onFound: (String) -> Unit) {
         viewModelScope.launch {
-            // prefer cached matchId from enriched list
             val cached = _uiState.value.enriched.find { it.dto.p1Fullname == p1 && it.dto.p2Fullname == p2 }?.matchId
-            val id = cached ?: runCatching { repository.findMatchIdByPlayers(p1, p2) }.getOrNull()
+            val predDate = _uiState.value.date.takeIf { it.isNotBlank() }
+            val id = cached ?: runCatching { repository.findMatchIdByPlayers(p1, p2, predDate) }.getOrNull()
             if (id != null) onFound(id)
         }
     }
@@ -128,7 +128,7 @@ class AiRecommendationsViewModel @Inject constructor(
                     Timber.d("AI_SORT conf=%.3f p1=%.3f p2=%.3f absDiff=%.3f %s vs %s"
                         .format(m.confidence, m.p1Prob, m.p2Prob, abs(m.p1Prob - m.p2Prob), m.p1Fullname, m.p2Fullname))
                 }
-                val enriched = runCatching { repository.enrichAiPredictions(dtos) }.getOrElse { dtos.map { EnrichedAiPrediction(it) } }
+                val enriched = runCatching { repository.enrichAiPredictions(dtos, data?.date) }.getOrElse { dtos.map { EnrichedAiPrediction(it) } }
                 val cur = _uiState.value
                 val filtered = applyFilters(enriched, cur.tourFilter, cur.formatFilter, cur.categoryFilter)
                 _uiState.value = cur.copy(

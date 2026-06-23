@@ -103,19 +103,31 @@ class TennisRepository @Inject constructor(
         return "$last|$firstInitial"
     }
 
-    suspend fun findMatchIdByPlayers(p1: String, p2: String): String? {
-        val dateStr = java.time.LocalDate.now().format(dateFormatter)
-        val matches = matchDao.getMatchesForDate(dateStr).first()
+    suspend fun findMatchIdByPlayers(p1: String, p2: String, predictionDate: String? = null): String? {
         val k1 = aiNameKey(p1); val k2 = aiNameKey(p2)
-        return matches.find { m ->
-            val hk = aiNameKey(m.homePlayer); val ak = aiNameKey(m.awayPlayer)
-            (hk == k1 && ak == k2) || (hk == k2 && ak == k1)
-        }?.id
+        val datesToTry = buildSet {
+            if (predictionDate != null) add(predictionDate)
+            add(java.time.LocalDate.now().format(dateFormatter))
+            add(java.time.LocalDate.now().plusDays(1).format(dateFormatter))
+        }
+        for (dateStr in datesToTry) {
+            val matches = matchDao.getMatchesForDate(dateStr).first()
+            val hit = matches.find { m ->
+                val hk = aiNameKey(m.homePlayer); val ak = aiNameKey(m.awayPlayer)
+                (hk == k1 && ak == k2) || (hk == k2 && ak == k1)
+            }
+            if (hit != null) return hit.id
+        }
+        return null
     }
 
-    suspend fun enrichAiPredictions(dtos: List<com.lenz.tennisapp.data.api.PredictionMatchDto>): List<com.lenz.tennisapp.ui.screens.airecommendations.EnrichedAiPrediction> {
-        val dateStr = java.time.LocalDate.now().format(dateFormatter)
-        val entities = matchDao.getMatchesForDate(dateStr).first()
+    suspend fun enrichAiPredictions(dtos: List<com.lenz.tennisapp.data.api.PredictionMatchDto>, predictionDate: String? = null): List<com.lenz.tennisapp.ui.screens.airecommendations.EnrichedAiPrediction> {
+        val datesToTry = buildSet {
+            if (predictionDate != null) add(predictionDate)
+            add(java.time.LocalDate.now().format(dateFormatter))
+            add(java.time.LocalDate.now().plusDays(1).format(dateFormatter))
+        }
+        val entities = datesToTry.flatMap { matchDao.getMatchesForDate(it).first() }
         return dtos.map { dto ->
             val k1 = aiNameKey(dto.p1Fullname); val k2 = aiNameKey(dto.p2Fullname)
             val entity = entities.find { m ->
