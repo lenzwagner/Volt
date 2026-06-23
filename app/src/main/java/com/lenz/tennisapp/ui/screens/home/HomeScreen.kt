@@ -793,6 +793,24 @@ fun MatchRow(
                             ScoreText(awayScore, awayWonSet, setDone)
                         }
                     }
+                    // If last known set is complete and match still live → API hasn't
+                    // added new set to score yet; show implicit 0-0 for ongoing set
+                    val lastSetComplete = sets.isNotEmpty() && sets.lastOrNull()?.let {
+                        val h = it.split("-").getOrNull(0)?.trim()?.toIntOrNull() ?: 0
+                        val a = it.split("-").getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+                        (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2) ||
+                        (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
+                    } == true
+                    if (isLive && match.gameScore != null && lastSetComplete) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            ScoreText("0", false, false)
+                            Spacer(Modifier.height(8.dp))
+                            ScoreText("0", false, false)
+                        }
+                    }
                     // Current game score (live only)
                     if (isLive && match.gameScore != null) {
                         Column(
