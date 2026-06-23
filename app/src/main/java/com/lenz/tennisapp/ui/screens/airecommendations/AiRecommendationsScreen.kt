@@ -255,44 +255,74 @@ fun AiRecommendationsScreen(
 
             // ── All Picks expandable ─────────────────────────────────────
             item {
-                Row(
+                ElevatedCard(
+                    onClick = { allExpanded = !allExpanded },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { allExpanded = !allExpanded }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Column {
-                        Text(
-                            "Alle Prognosen",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Black,
-                            color = AuraDeep
-                        )
-                        Text(
-                            "${allSorted.size} Matches",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = AuraPurple
+                            ) {
+                                Text(
+                                    "${allSorted.size}",
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                            }
+                            Column {
+                                Text(
+                                    "Alle Prognosen",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = if (allExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = null,
+                            tint = AuraPurple
                         )
                     }
-                    Icon(
-                        imageVector = if (allExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = null,
-                        tint = AuraPurple
-                    )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
 
             if (allExpanded) {
+                item { Spacer(Modifier.height(2.dp)) }
                 items(allSorted, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_all" }) { match ->
-                    CompactPickRow(match, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    ElevatedCard(
+                        onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                        colors = CardDefaults.elevatedCardColors(containerColor = Color.White)
+                    ) {
+                        CompactPickRow(match)
+                    }
                 }
+                item { Spacer(Modifier.height(4.dp)) }
             }
         }
     }
@@ -522,7 +552,7 @@ private fun TopPickCard(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}
 // ── Compact row for "Alle" section ────────────────────────────────────────────
 
 @Composable
-private fun CompactPickRow(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}) {
+private fun CompactPickRow(enriched: EnrichedAiPrediction) {
     val match = enriched.dto
     val p1Wins = match.p1Prob >= match.p2Prob
     val p1Pct = (match.p1Prob * 100).toInt()
@@ -532,7 +562,7 @@ private fun CompactPickRow(enriched: EnrichedAiPrediction, onClick: () -> Unit =
     val tourLabel = enriched.tourLabel()
     val animP1 by animateFloatAsState(targetValue = match.p1Prob, animationSpec = tween(700), label = "cp1")
 
-    Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
