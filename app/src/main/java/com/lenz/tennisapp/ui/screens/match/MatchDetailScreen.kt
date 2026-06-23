@@ -393,7 +393,8 @@ private fun TopBarContent(
 
 @Composable
 private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, String) -> Unit) {
-    val hasScoreData = !match.score.isNullOrBlank() && match.score != "-"
+    val hasScoreData = !match.score.isNullOrBlank() && match.score != "-" &&
+        match.status != MatchStatus.NOT_STARTED && match.status != MatchStatus.TBD
     val isInPlay = match.status == MatchStatus.LIVE ||
         (hasScoreData && match.status != MatchStatus.FINISHED)
     val scoreParts = match.score?.takeIf { it.isNotBlank() && it != "-" }?.split(",") ?: emptyList()
@@ -579,8 +580,7 @@ private fun PlayerScoreRow(
             }
 
         } else {
-            // No score yet — VS
-            Text("VS", fontSize = 20.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.2f))
+            Text("–", fontSize = 24.sp, fontWeight = FontWeight.Light, color = Color.White.copy(alpha = 0.35f))
         }
     }
 }
