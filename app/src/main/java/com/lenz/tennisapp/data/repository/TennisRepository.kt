@@ -1101,9 +1101,10 @@ class TennisRepository @Inject constructor(
         if (syncedAt != null && !forceRefresh) {
             val syncedDay = Instant.ofEpochMilli(syncedAt)
                 .atZone(ZoneId.systemDefault()).toLocalDate()
-            // Already fetched today — return cache regardless (even if empty). Max 1 call/match/day.
             if (syncedDay == LocalDate.now()) {
-                return entity.oddsJson?.let { runCatching { oddsAdapter.fromJson(it) }.getOrNull() } ?: emptyList()
+                val cached = entity.oddsJson?.let { runCatching { oddsAdapter.fromJson(it) }.getOrNull() }
+                // Only return cache if non-empty — empty means old API fetched nothing, retry with OddsBlaze
+                if (!cached.isNullOrEmpty()) return cached
             }
         }
         // New day or never fetched — fetch once and lock with timestamp

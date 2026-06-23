@@ -133,10 +133,21 @@ class MatchDetailViewModel @Inject constructor(
 
             _uiState.value = when (result) {
                 is Result.Success -> {
-                    MatchDetailUiState.Loaded(
-                        detail = result.data,
-                        userPrediction = predMap[matchId]
-                    )
+                    // Merge latest score from DB — getMatchDetail reads DB at call-time,
+                    // but refreshSilent may have updated it since then.
+                    val fresh = repository.getFreshMatch(matchId)
+                    val detail = if (fresh != null) {
+                        result.data.copy(match = result.data.match.copy(
+                            score = fresh.score,
+                            gameScore = fresh.gameScore,
+                            status = fresh.status,
+                            isHomeServing = fresh.isHomeServing,
+                            setScores = fresh.setScores,
+                            finalResult = fresh.finalResult,
+                            winnerKey = fresh.winnerKey
+                        ))
+                    } else result.data
+                    MatchDetailUiState.Loaded(detail = detail, userPrediction = predMap[matchId])
                 }
                 is Result.Error -> {
                     val current = _uiState.value
