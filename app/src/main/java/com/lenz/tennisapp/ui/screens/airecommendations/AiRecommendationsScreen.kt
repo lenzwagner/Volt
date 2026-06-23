@@ -41,7 +41,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lenz.tennisapp.data.api.PredictionMatchDto
+import com.lenz.tennisapp.ui.screens.home.CategoryFilter
 import com.lenz.tennisapp.ui.screens.home.FilterSection
+import com.lenz.tennisapp.ui.screens.home.FormatFilter
+import com.lenz.tennisapp.ui.screens.home.TourFilter
 import com.lenz.tennisapp.ui.theme.*
 
 private fun PredictionMatchDto.isTopPick(): Boolean =
@@ -64,8 +67,9 @@ fun AiRecommendationsScreen(
     var allExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
-    val activeFilterCount = (if (state.tourFilter != AiTourFilter.ALL) 1 else 0) +
-                            (if (state.categoryFilter != AiCategoryFilter.ALL) 1 else 0)
+    val activeFilterCount = (if (state.tourFilter != TourFilter.ALL) 1 else 0) +
+                            (if (state.formatFilter != FormatFilter.ALL) 1 else 0) +
+                            (if (state.categoryFilter != CategoryFilter.ALL) 1 else 0)
 
     val topPicks = remember(state.filtered) {
         state.filtered.filter { it.dto.isTopPick() }.sortedByDescending { it.dto.sortScore(AiSortMode.WEIGHTED) }
@@ -336,14 +340,21 @@ fun AiRecommendationsScreen(
                         Spacer(Modifier.height(20.dp))
                         FilterSection(
                             title = "Tour",
-                            options = AiTourFilter.entries,
+                            options = TourFilter.entries,
                             selected = state.tourFilter,
                             onSelect = viewModel::setTourFilter
                         )
                         Spacer(Modifier.height(20.dp))
                         FilterSection(
+                            title = "Format",
+                            options = FormatFilter.entries,
+                            selected = state.formatFilter,
+                            onSelect = viewModel::setFormatFilter
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        FilterSection(
                             title = "Kategorie",
-                            options = AiCategoryFilter.entries,
+                            options = CategoryFilter.entries,
                             selected = state.categoryFilter,
                             onSelect = viewModel::setCategoryFilter
                         )

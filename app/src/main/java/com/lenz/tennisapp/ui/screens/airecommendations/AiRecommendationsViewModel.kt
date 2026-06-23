@@ -5,6 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.lenz.tennisapp.data.api.PredictionMatchDto
 import com.lenz.tennisapp.data.repository.TennisRepository
 import com.lenz.tennisapp.domain.model.TournamentCategory
+import com.lenz.tennisapp.ui.screens.home.CategoryFilter
+import com.lenz.tennisapp.ui.screens.home.FormatFilter
+import com.lenz.tennisapp.ui.screens.home.TourFilter
+import com.lenz.tennisapp.ui.screens.home.matchCategory
+import com.lenz.tennisapp.ui.screens.home.matchFormat
+import com.lenz.tennisapp.ui.screens.home.matchTour
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,18 +25,6 @@ enum class AiSortMode(val label: String) {
     ACCURACY("Wahrsch.")
 }
 
-enum class AiTourFilter(val label: String) {
-    ALL("Alle"), ATP("ATP"), WTA("WTA"), DOUBLES("Doubles");
-    override fun toString() = label
-}
-
-enum class AiCategoryFilter(val label: String, val minPoints: Int) {
-    ALL("Alle", 0),
-    F500("500+", 500),
-    F1000("1000+", 1000),
-    GS("Grand Slam", 2000);
-    override fun toString() = label
-}
 
 data class EnrichedAiPrediction(
     val dto: PredictionMatchDto,
@@ -50,8 +44,9 @@ data class AiRecommendationsUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val sortMode: AiSortMode = AiSortMode.WEIGHTED,
-    val tourFilter: AiTourFilter = AiTourFilter.ALL,
-    val categoryFilter: AiCategoryFilter = AiCategoryFilter.ALL
+    val tourFilter: TourFilter = TourFilter.ALL,
+    val formatFilter: FormatFilter = FormatFilter.ALL,
+    val categoryFilter: CategoryFilter = CategoryFilter.ALL
 ) {
     // kept for backward compat with sortScore extension
     val matches: List<PredictionMatchDto> get() = enriched.map { it.dto }
@@ -83,24 +78,42 @@ class AiRecommendationsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(sortMode = mode)
     }
 
-    fun setTourFilter(f: AiTourFilter) {
-        _uiState.value = _uiState.value.copy(tourFilter = f, filtered = applyFilters(_uiState.value.enriched, f, _uiState.value.categoryFilter))
+    fun setTourFilter(f: TourFilter) {
+        val cur = _uiState.value
+        _uiState.value = cur.copy(tourFilter = f, filtered = applyFilters(cur.enriched, f, cur.formatFilter, cur.categoryFilter))
     }
 
-    fun setCategoryFilter(f: AiCategoryFilter) {
-        _uiState.value = _uiState.value.copy(categoryFilter = f, filtered = applyFilters(_uiState.value.enriched, _uiState.value.tourFilter, f))
+    fun setFormatFilter(f: FormatFilter) {
+        val cur = _uiState.value
+        _uiState.value = cur.copy(formatFilter = f, filtered = applyFilters(cur.enriched, cur.tourFilter, f, cur.categoryFilter))
     }
 
-    private fun applyFilters(list: List<EnrichedAiPrediction>, tour: AiTourFilter, cat: AiCategoryFilter): List<EnrichedAiPrediction> {
+    fun setCategoryFilter(f: CategoryFilter) {
+        val cur = _uiState.value
+        _uiState.value = cur.copy(categoryFilter = f, filtered = applyFilters(cur.enriched, cur.tourFilter, cur.formatFilter, f))
+    }
+
+    private fun applyFilters(
+        list: List<EnrichedAiPrediction>,
+        tour: TourFilter,
+        format: FormatFilter,
+        cat: CategoryFilter
+    ): List<EnrichedAiPrediction> {
         return list.filter { e ->
+            // reuse home-screen filter logic via a minimal TennisMatch-like proxy
+            val eventType = e.eventType
             val tourOk = when (tour) {
-                AiTourFilter.ALL     -> true
-                AiTourFilter.ATP     -> e.isAtp && !e.isDoubles
-                AiTourFilter.WTA     -> e.isWta && !e.isDoubles
-                AiTourFilter.DOUBLES -> e.isDoubles
+                TourFilter.ALL -> true
+                TourFilter.ATP -> eventType.lowercase().let { it.contains("atp") || (it.contains("challenger") && !it.contains("women")) }
+                TourFilter.WTA -> eventType.lowercase().let { it.contains("wta") || it.contains("women") }
             }
-            val catOk = cat == AiCategoryFilter.ALL || (e.category?.points ?: 0) >= cat.minPoints
-            tourOk && catOk
+            val fmtOk = when (format) {
+                FormatFilter.ALL     -> true
+                FormatFilter.SINGLES -> eventType.lowercase().let { !it.contains("doubles") && !it.contains("mixed") }
+                FormatFilter.DOUBLES -> eventType.lowercase().let { it.contains("doubles") || it.contains("mixed") }
+            }
+            val catOk = matchCategory(e.category ?: TournamentCategory.OTHER, cat)
+            tourOk && fmtOk && catOk
         }
     }
 
@@ -117,7 +130,7 @@ class AiRecommendationsViewModel @Inject constructor(
                 }
                 val enriched = runCatching { repository.enrichAiPredictions(dtos) }.getOrElse { dtos.map { EnrichedAiPrediction(it) } }
                 val cur = _uiState.value
-                val filtered = applyFilters(enriched, cur.tourFilter, cur.categoryFilter)
+                val filtered = applyFilters(enriched, cur.tourFilter, cur.formatFilter, cur.categoryFilter)
                 _uiState.value = cur.copy(
                     enriched = enriched,
                     filtered = filtered,

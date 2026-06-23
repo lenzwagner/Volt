@@ -68,6 +68,30 @@ class TennisRepository @Inject constructor(
 
     suspend fun getAiPredictions(): com.lenz.tennisapp.data.api.PredictionsResponse? = getCachedPredictions()
 
+    private fun injectPredictionIfMissing(detail: MatchDetail): MatchDetail {
+        if (detail.prediction != null) return detail
+        val resp = cachedPredictions ?: return detail
+        val match = detail.match
+        fun nk(s: String) = aiNameKey(s)
+        val k1h = nk(match.homePlayer.name); val k2h = nk(match.awayPlayer.name)
+        val dto = resp.data?.matches?.firstOrNull { m ->
+            val mk1 = nk(m.p1Fullname); val mk2 = nk(m.p2Fullname)
+            (mk1 == k1h && mk2 == k2h) || (mk1 == k2h && mk2 == k1h)
+        } ?: return detail
+        val swapped = nk(dto.p1Fullname) == k2h
+        val p1Prob = if (swapped) dto.p2Prob else dto.p1Prob
+        val p2Prob = if (swapped) dto.p1Prob else dto.p2Prob
+        val conf = when {
+            dto.confidence >= 0.65f -> PredictionConfidence.HIGH
+            dto.confidence >= 0.50f -> PredictionConfidence.MEDIUM
+            else -> PredictionConfidence.LOW
+        }
+        val prediction = MatchPrediction(p1Prob, p2Prob, conf, emptyList())
+        val updated = detail.copy(prediction = prediction)
+        matchDetailCache[match.id] = updated
+        return updated
+    }
+
     private fun aiNameKey(raw: String): String {
         val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return ""
@@ -620,9 +644,11 @@ class TennisRepository @Inject constructor(
     suspend fun getMatchDetailBase(matchId: String): Result<MatchDetail> {
         // Return cached version, but invalidate if match status changed to FINISHED since caching.
         matchDetailCache[matchId]?.let { cached ->
-            if (cached.match.status == MatchStatus.FINISHED) return Result.Success(cached)
+            if (cached.match.status == MatchStatus.FINISHED) {
+                return Result.Success(injectPredictionIfMissing(cached))
+            }
             val currentStatus = matchDao.getMatchById(matchId)?.toDomain()?.status
-            if (currentStatus != MatchStatus.FINISHED) return Result.Success(cached)
+            if (currentStatus != MatchStatus.FINISHED) return Result.Success(injectPredictionIfMissing(cached))
             matchDetailCache.remove(matchId) // fall through to re-fetch with final result
         }
 
