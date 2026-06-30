@@ -641,11 +641,12 @@ fun MatchRow(
 ) {
     val isFinished = match.status == MatchStatus.FINISHED
     val isLive = match.status == MatchStatus.LIVE
+    val isInterrupted = match.status == MatchStatus.INTERRUPTED
     val isTbd = match.status == MatchStatus.TBD
 
     val cardAlpha = if (isFinished) 0.55f else 1f
 
-    val isUpcoming = !isLive && !isFinished && !isTbd
+    val isUpcoming = !isLive && !isFinished && !isInterrupted && !isTbd
 
     Surface(
         onClick = onClick,
@@ -728,22 +729,38 @@ fun MatchRow(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.width(56.dp)
                 ) {
-                    if (isLive) {
-                        Surface(
-                            color = Color.Red,
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    when {
+                        isLive -> {
+                            Surface(
+                                color = Color.Red,
+                                shape = RoundedCornerShape(4.dp)
                             ) {
-                                LivePulsingDot()
-                                Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
-                    } else {
-                        Text("FT", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        isInterrupted -> {
+                            Surface(
+                                color = Color(0xFF9E9E9E),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    "INT.",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        else -> {
+                            Text("FT", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 

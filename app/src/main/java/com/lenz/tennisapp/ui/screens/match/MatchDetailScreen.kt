@@ -302,17 +302,17 @@ private fun MatchDetailContent(
 private fun translateRound(round: String): String {
     val r = round.lowercase().trim()
     return when {
-        r.contains("final") && r.contains("quarter") -> "Viertelfinale"
-        r.contains("final") && r.contains("semi")    -> "Halbfinale"
-        r.contains("final")                          -> "Finale"
-        r.contains("round of 64")  || r == "r64"    -> "Runde der letzten 64"
-        r.contains("round of 32")  || r == "r32"    -> "Runde der letzten 32"
-        r.contains("round of 16")  || r == "r16"    -> "Achtelfinale"
-        r.contains("round of 128") || r == "r128"   -> "Runde der letzten 128"
+        r.contains("round of 128") || r == "r128" || r.contains("1/64") -> "Runde der letzten 128"
+        r.contains("round of 64")  || r == "r64"  || r.contains("1/32") -> "Runde der letzten 64"
+        r.contains("round of 32")  || r == "r32"  || r.contains("1/16") -> "Runde der letzten 32"
+        r.contains("round of 16")  || r == "r16"  || r.contains("1/8")  -> "Achtelfinale"
         r.contains("1st round") || r.contains("first round") || r == "r1" -> "1. Runde"
         r.contains("2nd round") || r.contains("second round") || r == "r2" -> "2. Runde"
         r.contains("3rd round") || r.contains("third round")  || r == "r3" -> "3. Runde"
         r.contains("4th round") || r.contains("fourth round") || r == "r4" -> "4. Runde"
+        r.contains("quarter") -> "Viertelfinale"
+        r.contains("semi") -> "Halbfinale"
+        r == "final" || r == "finals" -> "Finale"
         r.contains("qualifying") -> "Qualifikation"
         r.contains("group") -> "Gruppenphase"
         else -> round
@@ -432,6 +432,7 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
     val statusLabel = when (match.status) {
         MatchStatus.LIVE -> "LIVE"
         MatchStatus.FINISHED -> "Beendet"
+        MatchStatus.INTERRUPTED -> "Unterbrochen"
         else -> match.time.take(5)
     }
 

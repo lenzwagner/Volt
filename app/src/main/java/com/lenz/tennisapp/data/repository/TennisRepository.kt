@@ -96,11 +96,26 @@ class TennisRepository @Inject constructor(
     private fun aiNameKey(raw: String): String {
         val parts = raw.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return ""
+        
         val isInitial = { t: String -> t.length <= 2 && (t.endsWith(".") || t.length == 1) }
         val names = parts.filterNot(isInitial)
-        val last = (names.lastOrNull() ?: parts.last()).lowercase().trim('.', ',')
-        val firstInitial = (parts.filter(isInitial).firstOrNull()?.firstOrNull()
-            ?: names.firstOrNull()?.firstOrNull())?.lowercaseChar() ?: ' '
+        if (names.isEmpty()) return parts.last().lowercase()
+
+        // Heuristic: identify the last name. 
+        // In "LASTNAME Firstname" (Tennis API), it's the first part.
+        // In "Firstname Lastname" (AI Predictions), it's the last part.
+        // If a part is ALL CAPS (length > 1), it's likely the last name.
+        val allCapsParts = names.filter { it.length > 1 && it.all { c -> c.isUpperCase() || !c.isLetter() } }
+        val last = if (allCapsParts.isNotEmpty()) {
+            allCapsParts.last().lowercase().trim('.', ',')
+        } else {
+            names.last().lowercase().trim('.', ',')
+        }
+
+        // First initial: take from the part that isn't the last name
+        val firstInitial = (names.firstOrNull { it.lowercase() != last } ?: parts.firstOrNull { it.lowercase() != last })
+            ?.firstOrNull()?.lowercaseChar() ?: ' '
+        
         return "$last|$firstInitial"
     }
 
@@ -236,30 +251,28 @@ class TennisRepository @Inject constructor(
         matchDao.getMatchesByLeagueId(leagueId).map { entities -> entities.map { it.toDomain() } }
 
     suspend fun fetchOnce(): List<Tournament> = withContext(Dispatchers.Default) {
-        val dateStr = java.time.LocalDate.now().format(dateFormatter)
+        val today = java.time.LocalDate.now()
+        val yesterday = today.minusDays(1)
+        val todayStr = today.format(dateFormatter)
+        val yesterdayStr = yesterday.format(dateFormatter)
+        
         val apiKey = keyStore.tennisApiKey.first().takeIf { it.isNotBlank() }
         try {
-            val response = tennisApi.getFixtures(eventType = 1, dateStart = dateStr, dateStop = dateStr, apiKey = apiKey)
-            Timber.d("fetchOnce API Response: success=${response.success}, error=${response.error}, resultSize=${response.result?.size}")
+            // Fetch yesterday and today to catch carry-over matches (rain delays)
+            val response = tennisApi.getFixtures(eventType = 1, dateStart = yesterdayStr, dateStop = todayStr, apiKey = apiKey)
+            Timber.d("fetchOnce API Response: success=${response.success}, resultSize=${response.result?.size}")
             
-            // The API returns `success` inconsistently (sometimes null/number even on a
-            // valid response). Trust the presence of `result` instead: if the API gave us
-            // a result list, it's a valid answer for today and we replace the cache.
             if (response.result != null) {
                 val entities = response.result.mapNotNull { it.toEntity() }
                 upsertMatchesPreservingOdds(entities)
-                Timber.d("Replaced DB with ${entities.size} fresh matches")
                 seedPlayersFromMatches(response.result)
-                return@withContext groupIntoTournaments(entities)
-            } else if (response.error != null) {
-                Timber.w("API returned error: ${response.error}")
             }
         } catch (e: Exception) {
             Timber.e(e, "fetchOnce API error")
         }
-        // Fallback: show only today's cached matches, never stale games from previous days
-        val entities = matchDao.getMatchesForDate(dateStr).first()
-        Timber.d("DB fallback: ${entities.size} cached matches for $dateStr")
+        
+        // Return only matches for today's view (including those started yesterday but updated today)
+        val entities = matchDao.getMatchesForDate(todayStr).first()
         return@withContext groupIntoTournaments(entities)
     }
 
@@ -524,9 +537,10 @@ class TennisRepository @Inject constructor(
             awayPlayer = Player(awayPlayerKey, awayPlayer, logoUrl = secondPlayerLogo),
             status = when {
                 status == "Finished" || status == "Retired" || status == "Walkover" -> MatchStatus.FINISHED
-                isLive && (System.currentTimeMillis() - cachedAt) < 45 * 60 * 1000L -> MatchStatus.LIVE
                 status == "Cancelled" -> MatchStatus.CANCELLED
                 status == "Postponed" -> MatchStatus.POSTPONED
+                status == "Interrupted" || status == "Delayed" || status == "Suspended" -> MatchStatus.INTERRUPTED
+                isLive && (System.currentTimeMillis() - cachedAt) < 45 * 60 * 1000L -> MatchStatus.LIVE
                 status.isNullOrBlank() && finalResult.isNullOrBlank() -> MatchStatus.TBD
                 else -> MatchStatus.NOT_STARTED
             },
@@ -792,7 +806,7 @@ class TennisRepository @Inject constructor(
             }
             val h2hDeferred = async {
                 try {
-                    kotlinx.coroutines.withTimeout(7_000) {
+                    kotlinx.coroutines.withTimeout(45_000) {
                         rankingProxy.getH2H(
                             p1 = normalizePlayerName(match.homePlayer.name),
                             p2 = normalizePlayerName(match.awayPlayer.name),
@@ -819,33 +833,45 @@ class TennisRepository @Inject constructor(
             val resp = parallel.h2hResp
             if (resp != null && resp.success && resp.data != null) {
                 val d = resp.data
+                // Check if proxy's P1 corresponds to our home player
+                val homeLast = match.homePlayer.name.split(" ").first().lowercase()
+                val awayLast = match.awayPlayer.name.split(" ").first().lowercase()
+                val proxyP1 = d.player1?.lowercase() ?: ""
+                
+                val p1IsHome = proxyP1.contains(homeLast) || homeLast.contains(proxyP1.split(" ").firstOrNull() ?: "")
+                val (p1Wins, p2Wins) = if (p1IsHome) {
+                    d.overall.p1 to d.overall.p2
+                } else {
+                    // If proxy P1 is actually our away player, swap the wins
+                    val p1IsAway = proxyP1.contains(awayLast) || awayLast.contains(proxyP1.split(" ").firstOrNull() ?: "")
+                    if (p1IsAway) d.overall.p2 to d.overall.p1 else d.overall.p1 to d.overall.p2
+                }
+
                 H2HResult(
                     player1Name = match.homePlayer.name,
                     player2Name = match.awayPlayer.name,
-                    player1Wins = d.overall.p1,
-                    player2Wins = d.overall.p2,
+                    player1Wins = p1Wins,
+                    player2Wins = p2Wins,
                     recentMatches = d.matches.take(10).map { m ->
-                        // Tennis API: "LASTNAME Firstname" → first token is the actual last name.
-                        // Proxy returns short names like "Zverev", "Fritz" — match on last name.
-                        val homeLastName = match.homePlayer.name.split(" ").first().lowercase()
-                        val p1IsHome = m.player1.name.lowercase().let {
-                            it == homeLastName || it.contains(homeLastName) || homeLastName.contains(it)
-                        }
-                        val (p1SetsFinal, p2SetsFinal, p1ScoresFinal, p2ScoresFinal) = if (p1IsHome) {
-                            val p1S = m.player1.sets as? Number ?: 0
-                            val p2S = m.player2.sets as? Number ?: 0
-                            val p1List = (m.player1.scores as? List<*>)?.map { it.toString() } ?: emptyList()
-                            val p2List = (m.player2.scores as? List<*>)?.map { it.toString() } ?: emptyList()
-                            listOf(p1S.toInt(), p2S.toInt(), p1List, p2List)
+                        // Determine if match.homePlayer is P1 in this historical match record
+                        val mP1Name = m.player1.name.lowercase()
+                        val mP1IsHome = mP1Name.contains(homeLast) || homeLast.contains(mP1Name.split(" ").firstOrNull() ?: "")
+                        
+                        val (p1SetsFinal, p2SetsFinal, p1ScoresFinal, p2ScoresFinal) = if (mP1IsHome) {
+                            val p1S = (m.player1.sets as? Number)?.toInt() ?: 0
+                            val p2S = (m.player2.sets as? Number)?.toInt() ?: 0
+                            val p1List = m.player1.scores
+                            val p2List = m.player2.scores
+                            listOf(p1S, p2S, p1List, p2List)
                         } else {
-                            val p1S = m.player2.sets as? Number ?: 0
-                            val p2S = m.player1.sets as? Number ?: 0
-                            val p1List = (m.player2.scores as? List<*>)?.map { it.toString() } ?: emptyList()
-                            val p2List = (m.player1.scores as? List<*>)?.map { it.toString() } ?: emptyList()
-                            listOf(p1S.toInt(), p2S.toInt(), p1List, p2List)
+                            val p1S = (m.player2.sets as? Number)?.toInt() ?: 0
+                            val p2S = (m.player1.sets as? Number)?.toInt() ?: 0
+                            val p1List = m.player2.scores
+                            val p2List = m.player1.scores
+                            listOf(p1S, p2S, p1List, p2List)
                         }
 
-                        val winnerName = if ((m.winner == "p1") == p1IsHome) match.homePlayer.name else match.awayPlayer.name
+                        val winnerName = if ((m.winner == "p1") == mP1IsHome) match.homePlayer.name else match.awayPlayer.name
                         val surf = when (m.surface.lowercase()) {
                             "clay" -> Surface.CLAY
                             "grass" -> Surface.GRASS
@@ -982,7 +1008,7 @@ class TennisRepository @Inject constructor(
                 when { h > a -> hKey; a > h -> aKey; else -> null }
             } catch (_: Exception) { null }
         }
-        val winnerKey = match.winnerKey ?: inferWinner(match.finalResult, entity.homePlayerKey, entity.awayPlayerKey)
+        val winnerKey = match.winnerKey
         val finalH2H = if (match.status == MatchStatus.FINISHED && winnerKey != null) {
             val winnerName = if (winnerKey == entity.homePlayerKey) match.homePlayer.name else match.awayPlayer.name
             val alreadyPresent = h2hResult.recentMatches.firstOrNull()?.date == match.date &&
@@ -1069,11 +1095,22 @@ class TennisRepository @Inject constructor(
 
     // Tennis API uses "LASTNAME Firstname" — convert to "Firstname Lastname" for the H2H proxy.
     private fun normalizePlayerName(apiName: String): String {
-        val parts = apiName.trim().split(" ")
+        val parts = apiName.trim().split(" ").filter { it.isNotBlank() }
         if (parts.size < 2) return apiName
-        val last = parts[0].lowercase().replaceFirstChar { it.uppercase() }
-        val first = parts.drop(1).joinToString(" ")
-        return "$first $last"
+        
+        // Find the last name part (usually ALL CAPS in Tennis API)
+        val lastNameParts = parts.filter { it.length > 1 && it.all { c -> c.isUpperCase() || !c.isLetter() } }
+        
+        return if (lastNameParts.isNotEmpty()) {
+            val last = lastNameParts.joinToString(" ") { it.lowercase().replaceFirstChar { c -> c.uppercase() } }
+            val first = parts.filter { it !in lastNameParts }.joinToString(" ")
+            "$first $last".trim()
+        } else {
+            // Fallback for names already in First Last or mixed format
+            val last = parts[0].lowercase().replaceFirstChar { it.uppercase() }
+            val first = parts.drop(1).joinToString(" ")
+            "$first $last"
+        }
     }
 
     private fun getBestNamePart(fullName: String): String {

@@ -162,7 +162,7 @@ enum class Surface(val displayName: String) {
 }
 
 enum class MatchStatus {
-    NOT_STARTED, TBD, LIVE, FINISHED, POSTPONED, CANCELLED;
+    NOT_STARTED, TBD, LIVE, FINISHED, POSTPONED, CANCELLED, INTERRUPTED;
 }
 
 // ─── User Prediction models ──────────────────────────────────────────────────

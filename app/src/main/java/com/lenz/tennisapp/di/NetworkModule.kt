@@ -64,7 +64,7 @@ object NetworkModule {
     @Singleton
     fun provideRankingProxyService(moshi: Moshi): com.lenz.tennisapp.data.api.RankingProxyService = Retrofit.Builder()
         .baseUrl("https://tennis-ranking-proxy.onrender.com/")
-        .client(baseOkHttp().build())
+        .client(baseOkHttp().readTimeout(60, TimeUnit.SECONDS).build())
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
         .create(com.lenz.tennisapp.data.api.RankingProxyService::class.java)
