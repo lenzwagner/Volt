@@ -344,23 +344,6 @@ fun CompactFilterRow(
             }
         }
 
-        // Collapse All Button
-        Surface(
-            onClick = onCollapseAll,
-            color = Color(0xFFF5F5F5),
-            shape = CircleShape,
-            modifier = Modifier.size(40.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.UnfoldLess,
-                    contentDescription = "Alle einklappen",
-                    tint = Color.DarkGray,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
         // Live Toggle Button
         Surface(
             onClick = onToggleLive,
@@ -435,12 +418,30 @@ fun CompactFilterRow(
         Spacer(Modifier.weight(1f))
 
         // Date indicator (optional placeholder for "Heute")
-        Text(
-            "Heute",
-            color = AuraPurple,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Surface(
+            onClick = onCollapseAll,
+            color = AuraPurple.copy(alpha = 0.08f),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    "Heute",
+                    color = AuraPurple,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    Icons.Default.UnfoldLess,
+                    contentDescription = "Alle einklappen",
+                    tint = AuraPurple,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 
@@ -675,7 +676,12 @@ fun MatchRow(
                 ) {
                     Text(
                         text = match.time,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            lineHeight = 32.sp,
+                            platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                includeFontPadding = false
+                            )
+                        ),
                         color = Color.DarkGray,
                         fontWeight = FontWeight.Medium
                     )
@@ -763,78 +769,90 @@ fun MatchRow(
 
                 // Score columns
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.width(150.dp),
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Set scores
-                    homeSets.forEachIndexed { i, homeScore ->
-                        val awayScore = awaySets.getOrNull(i) ?: ""
-                        
-                        fun parseGames(s: String): Int {
-                            return when {
-                                "(" in s -> s.substring(0, s.indexOf("(")).trim().toIntOrNull() ?: 0
-                                "." in s -> s.substring(0, s.indexOf(".")).trim().toIntOrNull() ?: 0
-                                else -> s.trim().toIntOrNull() ?: 0
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Set scores
+                        homeSets.forEachIndexed { i, homeScore ->
+                            val awayScore = awaySets.getOrNull(i) ?: ""
+                            
+                            fun parseGames(s: String): Int {
+                                return when {
+                                    "(" in s -> s.substring(0, s.indexOf("(")).trim().toIntOrNull() ?: 0
+                                    "." in s -> s.substring(0, s.indexOf(".")).trim().toIntOrNull() ?: 0
+                                    else -> s.trim().toIntOrNull() ?: 0
+                                }
                             }
-                        }
 
-                        val h = parseGames(homeScore)
-                        val a = parseGames(awayScore)
-                        val homeWonSet = (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2)
-                        val awayWonSet = (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
-                        val setDone = homeWonSet || awayWonSet
+                            val h = parseGames(homeScore)
+                            val a = parseGames(awayScore)
+                            val homeWonSet = (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2)
+                            val awayWonSet = (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
+                            val setDone = homeWonSet || awayWonSet
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            ScoreText(homeScore, homeWonSet, setDone)
-                            Spacer(Modifier.height(8.dp))
-                            ScoreText(awayScore, awayWonSet, setDone)
-                        }
-                    }
-                    // If last known set is complete and match still live → API hasn't
-                    // added new set to score yet; show implicit 0-0 for ongoing set
-                    val lastSetComplete = sets.isNotEmpty() && sets.lastOrNull()?.let {
-                        val h = it.split("-").getOrNull(0)?.trim()?.toIntOrNull() ?: 0
-                        val a = it.split("-").getOrNull(1)?.trim()?.toIntOrNull() ?: 0
-                        (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2) ||
-                        (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
-                    } == true
-                    if (isLive && match.gameScore != null && lastSetComplete) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            ScoreText("0", false, false)
-                            Spacer(Modifier.height(8.dp))
-                            ScoreText("0", false, false)
-                        }
-                    }
-                    // Current game score (live only)
-                    if (isLive && match.gameScore != null) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(Modifier.height(32.dp), contentAlignment = Alignment.Center) {
-                                Text(homeGame, style = MaterialTheme.typography.titleMedium, color = Color.Red, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Box(Modifier.height(32.dp), contentAlignment = Alignment.Center) {
-                                Text(awayGame, style = MaterialTheme.typography.titleMedium, color = Color.Red, fontWeight = FontWeight.Bold)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                ScoreText(homeScore, homeWonSet, setDone)
+                                Spacer(Modifier.height(8.dp))
+                                ScoreText(awayScore, awayWonSet, setDone)
                             }
                         }
+                        // If last known set is complete and match still live → API hasn't
+                        // added new set to score yet; show implicit 0-0 for ongoing set
+                        val lastSetComplete = sets.isNotEmpty() && sets.lastOrNull()?.let {
+                            val h = it.split("-").getOrNull(0)?.trim()?.toIntOrNull() ?: 0
+                            val a = it.split("-").getOrNull(1)?.trim()?.toIntOrNull() ?: 0
+                            (h >= 6 && h - a >= 2) || (h == 7 && a == 6) || (h >= 10 && h - a >= 2) ||
+                            (a >= 6 && a - h >= 2) || (a == 7 && h == 6) || (a >= 10 && a - h >= 2)
+                        } == true
+                        if (isLive && match.gameScore != null && lastSetComplete) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                ScoreText("0", false, false)
+                                Spacer(Modifier.height(8.dp))
+                                ScoreText("0", false, false)
+                            }
+                        }
+                        // Current game score (live only)
+                        if (isLive && match.gameScore != null) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 6.dp, end = 4.dp)
+                                    .width(1.2.dp)
+                                    .height(52.dp)
+                                    .background(Color.LightGray.copy(alpha = 0.6f))
+                            )
+                            Column(
+                                modifier = Modifier.width(34.dp),
+                                horizontalAlignment = Alignment.Start,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                ScoreText(score = homeGame, isWinner = false, setDone = true, color = Color.Red, isBold = true, horizontalArrangement = Arrangement.Start)
+                                Spacer(Modifier.height(8.dp))
+                                ScoreText(score = awayGame, isWinner = false, setDone = true, color = Color.Red, isBold = true, horizontalArrangement = Arrangement.Start)
+                            }
+                        }
                     }
+                    
+                    Spacer(Modifier.width(4.dp))
+
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = Color.LightGray,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
-
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = Color.LightGray,
-                    modifier = Modifier.size(16.dp)
-                )
             }
-
         }
     }
 }
@@ -844,7 +862,9 @@ private fun ScoreText(
     score: String,
     isWinner: Boolean,
     setDone: Boolean,
-    color: Color? = null
+    color: Color? = null,
+    isBold: Boolean = false,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Center
 ) {
     val games = when {
         "(" in score -> score.substring(0, score.indexOf("("))
@@ -861,9 +881,9 @@ private fun ScoreText(
     Row(
         modifier = Modifier
             .height(32.dp)
-            .widthIn(min = 22.dp),
+            .width(if (horizontalArrangement == Arrangement.Start) 34.dp else 32.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = horizontalArrangement
     ) {
         Text(
             text = if (hasDot) "$games." else games,
@@ -873,13 +893,13 @@ private fun ScoreText(
                     includeFontPadding = false
                 )
             ),
-            fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (isBold || isWinner) FontWeight.Bold else FontWeight.Normal,
             color = color ?: when {
                 !setDone -> Color.Gray
                 isWinner -> Color.Black
                 else -> Color.Gray
             },
-            textAlign = TextAlign.Center
+            textAlign = if (horizontalArrangement == Arrangement.Start) TextAlign.Start else TextAlign.Center
         )
         if (tbPoints != null) {
             Text(
@@ -887,7 +907,7 @@ private fun ScoreText(
                 fontSize = 10.sp, 
                 fontWeight = FontWeight.Bold,
                 color = color?.copy(alpha = 0.7f) ?: if (isWinner) Color.Black.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.6f),
-                modifier = Modifier.align(Alignment.Top)
+                modifier = Modifier.align(Alignment.Top).padding(top = 4.dp)
             )
         }
     }
@@ -935,7 +955,12 @@ fun PlayerRow(
         // Name
         Text(
             text = player.name.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelMedium.copy(
+                lineHeight = 32.sp,
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            ),
             fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal,
             color = if (isWinner) Color.Black else Color.DarkGray,
             modifier = Modifier.weight(1f),

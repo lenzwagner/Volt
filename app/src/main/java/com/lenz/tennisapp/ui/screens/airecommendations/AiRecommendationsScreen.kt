@@ -209,27 +209,13 @@ fun AiRecommendationsScreen(
                             )
                         }
 
-                        Box {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                items(topPicks, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_top" }) { match ->
-                                    TopPickCard(match, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
-                                }
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(topPicks, key = { "${it.dto.p1Fullname}_${it.dto.p2Fullname}_top" }) { match ->
+                                TopPickCard(match, onClick = { viewModel.findAndNavigate(match.dto.p1Fullname, match.dto.p2Fullname, onMatchClick) })
                             }
-                            // Right edge fade
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .width(40.dp)
-                                    .height(180.dp)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(Color.White.copy(alpha = 0f), Color.White)
-                                        )
-                                    )
-                            )
                         }
                         Spacer(Modifier.height(4.dp))
                     }
@@ -486,19 +472,6 @@ private fun TopPickCard(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}
             modifier = Modifier
                 .fillMaxWidth()
         ) {
-            // Subtle shimmer dot top-right
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .offset(x = 140.dp, y = (-20).dp)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(AuraPurple.copy(alpha = 0.25f), Color.Transparent)
-                        ),
-                        CircleShape
-                    )
-            )
-
             Column(modifier = Modifier.padding(14.dp, 14.dp, 14.dp, 14.dp)) {
 
                 // Top row: badges | confidence chip
@@ -594,10 +567,7 @@ private fun TopPickCard(enriched: EnrichedAiPrediction, onClick: () -> Unit = {}
                 ) {
                     Box(
                         modifier = Modifier.fillMaxWidth(animP1).fillMaxHeight()
-                            .background(
-                                Brush.horizontalGradient(listOf(AuraLime, AuraPurple)),
-                                RoundedCornerShape(3.dp)
-                            )
+                            .background(AuraPurple, RoundedCornerShape(3.dp))
                     )
                 }
             }

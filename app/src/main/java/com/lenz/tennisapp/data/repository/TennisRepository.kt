@@ -794,8 +794,8 @@ class TennisRepository @Inject constructor(
                 try {
                     kotlinx.coroutines.withTimeout(7_000) {
                         rankingProxy.getH2H(
-                            p1 = match.homePlayer.name,
-                            p2 = match.awayPlayer.name,
+                            p1 = normalizePlayerName(match.homePlayer.name),
+                            p2 = normalizePlayerName(match.awayPlayer.name),
                             date = match.date.take(10),
                             tour = tourType
                         )
@@ -825,11 +825,11 @@ class TennisRepository @Inject constructor(
                     player1Wins = d.overall.p1,
                     player2Wins = d.overall.p2,
                     recentMatches = d.matches.take(10).map { m ->
-                        // Per-match check: which proxy player1/player2 is our homePlayer?
-                        // Compare last names (proxy uses short names like "Fritz", "Tiafoe")
-                        val homeLast = match.homePlayer.name.split(" ").last().lowercase()
+                        // Tennis API: "LASTNAME Firstname" → first token is the actual last name.
+                        // Proxy returns short names like "Zverev", "Fritz" — match on last name.
+                        val homeLastName = match.homePlayer.name.split(" ").first().lowercase()
                         val p1IsHome = m.player1.name.lowercase().let {
-                            it == homeLast || it.contains(homeLast) || homeLast.contains(it)
+                            it == homeLastName || it.contains(homeLastName) || homeLastName.contains(it)
                         }
                         val (p1SetsFinal, p2SetsFinal, p1ScoresFinal, p2ScoresFinal) = if (p1IsHome) {
                             val p1S = m.player1.sets as? Number ?: 0
@@ -1065,6 +1065,15 @@ class TennisRepository @Inject constructor(
         } catch (e: Exception) {
             Timber.w(e, "Failed to fetch recent match history")
         }
+    }
+
+    // Tennis API uses "LASTNAME Firstname" — convert to "Firstname Lastname" for the H2H proxy.
+    private fun normalizePlayerName(apiName: String): String {
+        val parts = apiName.trim().split(" ")
+        if (parts.size < 2) return apiName
+        val last = parts[0].lowercase().replaceFirstChar { it.uppercase() }
+        val first = parts.drop(1).joinToString(" ")
+        return "$first $last"
     }
 
     private fun getBestNamePart(fullName: String): String {
