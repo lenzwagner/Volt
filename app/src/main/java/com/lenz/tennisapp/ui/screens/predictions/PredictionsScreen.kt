@@ -47,7 +47,11 @@ fun PredictionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showPredictionsList by remember { mutableStateOf(true) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
+    ) {
         if (showHeader) {
             GreenHeader(title = "Prognosen", subtitle = "Deine Trefferquote")
         }

@@ -1119,10 +1119,8 @@ class TennisRepository @Inject constructor(
             val first = parts.filter { it !in lastNameParts }.joinToString(" ")
             "$first $last".trim()
         } else {
-            // Fallback for names already in First Last or mixed format
-            val last = parts[0].lowercase().replaceFirstChar { it.uppercase() }
-            val first = parts.drop(1).joinToString(" ")
-            "$first $last"
+            // If no ALL CAPS part, assume it's already in a usable format (likely First Last).
+            parts.joinToString(" ") { it.lowercase().replaceFirstChar { it.uppercase() } }
         }
     }
 

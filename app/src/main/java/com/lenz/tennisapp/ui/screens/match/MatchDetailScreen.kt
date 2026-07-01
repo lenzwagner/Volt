@@ -58,14 +58,40 @@ fun MatchDetailScreen(
     onBack: () -> Unit,
     onPlayerClick: (playerKey: String, playerName: String) -> Unit = { _, _ -> },
     onTournamentClick: (leagueId: String, name: String) -> Unit = { _, _ -> },
-    viewModel: MatchDetailViewModel = hiltViewModel()
+    viewModel: MatchDetailViewModel = hiltViewModel(),
+    settingsViewModel: com.lenz.tennisapp.ui.screens.settings.SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
-    val pageGradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFFAFAFC), Color(0xFFFAFAFC), Color(0xFFE5F2FD))
+    val infiniteTransition = rememberInfiniteTransition(label = "dynamicBgDetail")
+    val dynamicColor1 by infiniteTransition.animateColor(
+        initialValue = Color(0xFFE3F2FD),
+        targetValue = Color(0xFFC8E6C9),
+        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "c1"
     )
-    Box(modifier = Modifier.fillMaxSize().background(pageGradient)) {
+    val dynamicColor2 by infiniteTransition.animateColor(
+        initialValue = Color(0xFFBBDEFB),
+        targetValue = Color(0xFFA5D6A7),
+        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "c2"
+    )
+
+    val backgroundBrush = remember(settingsState.bgGradientHeight, settingsState.bgGradientColor, settingsState.bgGradientDynamic, dynamicColor1, dynamicColor2) {
+        val accentColor = if (settingsState.bgGradientDynamic) dynamicColor2 else Color(settingsState.bgGradientColor)
+        
+        // Use color stops: top remains white, gradient happens at the bottom.
+        val colorStart = (1f - (settingsState.bgGradientHeight * 0.5f)).coerceIn(0f, 0.95f)
+        
+        Brush.verticalGradient(
+            0.0f to Color.White,
+            colorStart to Color.White,
+            1.0f to accentColor
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(backgroundBrush)) {
         when (val s = state) {
             is MatchDetailUiState.Error -> {
                 Column(
@@ -830,8 +856,8 @@ private fun OddsSection(
     p1: Player,
     p2: Player
 ) {
-    val p1Name = p1.name.split(" ").last().uppercase()
-    val p2Name = p2.name.split(" ").last().uppercase()
+    val p1Name = remember(p1.name) { p1.name.split(" ").last().uppercase() }
+    val p2Name = remember(p2.name) { p2.name.split(" ").last().uppercase() }
 
     SectionTitle("WETTQUOTEN")
 
@@ -935,11 +961,13 @@ private fun OddsSection(
     }
 
     // No-vig probability bar (average across all bookmakers)
-    val avgP1Raw = odds.map { 1.0 / it.homeOdds }.average()
-    val avgP2Raw = odds.map { 1.0 / it.awayOdds }.average()
-    val overround = avgP1Raw + avgP2Raw
-    val p1Prob = (avgP1Raw / overround).toFloat()
-    val p2Prob = (avgP2Raw / overround).toFloat()
+    val avgP1Raw = remember(odds) { odds.map { 1.0 / it.homeOdds }.average() }
+    val avgP2Raw = remember(odds) { odds.map { 1.0 / it.awayOdds }.average() }
+    val p1Prob = remember(avgP1Raw, avgP2Raw) { 
+        val overround = avgP1Raw + avgP2Raw
+        (avgP1Raw / overround).toFloat() 
+    }
+    val p2Prob = remember(p1Prob) { 1f - p1Prob }
 
     Spacer(Modifier.height(16.dp))
     HorizontalDivider(color = Color(0xFFEEEEEE))

@@ -85,7 +85,9 @@ fun AiRecommendationsScreen(
     PullToRefreshBox(
         isRefreshing = state.isLoading,
         onRefresh = viewModel::refresh,
-        modifier = Modifier.fillMaxSize().background(Color.White)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

@@ -1,25 +1,27 @@
 package com.lenz.tennisapp.ui.screens.settings
 
-import androidx.compose.foundation.border
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.lenz.tennisapp.ui.components.GreenHeader
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -30,10 +32,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.work.WorkManager
-import com.lenz.tennisapp.worker.RankingsAndEloSyncWorker
-import com.lenz.tennisapp.ui.theme.AuraPurple
+import com.lenz.tennisapp.ui.components.GreenHeader
 import com.lenz.tennisapp.ui.theme.AuraDeep
-import kotlinx.coroutines.launch
+import com.lenz.tennisapp.ui.theme.AuraPurple
+import com.lenz.tennisapp.ui.theme.AuraLime
+import com.lenz.tennisapp.worker.RankingsAndEloSyncWorker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +47,11 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var isRefreshing by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Transparent)
+    ) {
         if (showHeader) {
             GreenHeader(title = "Einstellungen", subtitle = "API-Keys & Konfiguration")
         }
@@ -56,39 +63,80 @@ fun SettingsScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 160.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 160.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item { SectionLabel("Netzwerk & APIs") }
-
+                // ── Group 1: APIs ──────────────────────────────────────────
                 item {
-                    ApiSettingsBox(state = state, viewModel = viewModel)
+                    CollapsibleSettingsCard(
+                        title = "API Konfiguration",
+                        subtitle = "api-tennis.com & the-odds-api.com",
+                        icon = Icons.Default.VpnKey,
+                        initialExpanded = false
+                    ) {
+                        ApiSettingsContent(state = state, viewModel = viewModel)
+                    }
                 }
 
-                item { SectionLabel("Daten") }
+                // ── Group 2: Data & Sync ─────────────────────────────────────
+                item {
+                    CollapsibleSettingsCard(
+                        title = "Daten & Synchronisierung",
+                        subtitle = "Rankings, Elo-Scores & Quoten",
+                        icon = Icons.Default.Sync,
+                        initialExpanded = false
+                    ) {
+                        DataSyncContent()
+                    }
+                }
 
-                item { RankingsSyncCard() }
+                // ── Group 3: Appearance ──────────────────────────────────────
+                item {
+                    CollapsibleSettingsCard(
+                        title = "Darstellung",
+                        subtitle = "Farben, Verläufe & Tab-Bar",
+                        icon = Icons.Default.Palette,
+                        initialExpanded = false
+                    ) {
+                        AppearanceSettingsContent(state = state, viewModel = viewModel)
+                    }
+                }
 
-                item { OddsSyncCard() }
-
-                item { SectionLabel("Info") }
-
-                item { InfoCard() }
+                // ── Group 4: Roadmap & Info ──────────────────────────────────
+                item {
+                    CollapsibleSettingsCard(
+                        title = "Über & Roadmap",
+                        subtitle = "App Version & Kommende Features",
+                        icon = Icons.Default.Info,
+                        initialExpanded = false
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            UpcomingFeaturesContent()
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                            InfoContent()
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ApiSettingsBox(
-    state: SettingsUiState,
-    viewModel: SettingsViewModel
+private fun CollapsibleSettingsCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    initialExpanded: Boolean = false,
+    content: @Composable () -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(initialExpanded) }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             Row(
@@ -99,22 +147,37 @@ private fun ApiSettingsBox(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
                     Box(
-                        modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(AuraPurple.copy(alpha = 0.1f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.VpnKey, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(icon, null, tint = AuraPurple, modifier = Modifier.size(22.dp))
                     }
                     Column {
-                        Text("API Konfiguration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text("Verwalte und teste deine API-Schlüssel", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AuraDeep
+                        )
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AuraDeep.copy(alpha = 0.5f)
+                        )
                     }
                 }
                 Icon(
                     if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = AuraDeep.copy(alpha = 0.3f)
                 )
             }
 
@@ -124,44 +187,52 @@ private fun ApiSettingsBox(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column(
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    
-                    // Tennis API Section
-                    ApiKeySection(
-                        title = "Tennis API",
-                        subtitle = "api-tennis.com",
-                        currentKey = state.tennisKey,
-                        isExpired = state.tennisKeyExpired,
-                        statusText = if (state.tennisKeyExpired) "Fehlerhaft/Abgelaufen" else "Aktiv",
-                        isTesting = state.isTestingTennis,
-                        testResult = state.tennisTestResult,
-                        signupUrl = "https://api-tennis.com",
-                        onSave = viewModel::saveTennisKey,
-                        onTest = { viewModel.testTennisKey(it) }
-                    )
-
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // The Odds API Section
-                    ApiKeySection(
-                        title = "The Odds API",
-                        subtitle = "api.the-odds-api.com · ${state.oddsQuotaRemaining?.let { "$it Requests übrig" } ?: "Quota unbekannt"}",
-                        currentKey = state.oddsApiKey,
-                        isExpired = false,
-                        statusText = "Aktiv",
-                        isTesting = false,
-                        testResult = null,
-                        signupUrl = "https://the-odds-api.com",
-                        onSave = viewModel::saveOddsApiKey,
-                        onTest = {}
-                    )
-
+                    content()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ApiSettingsContent(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        // Tennis API Section
+        ApiKeySection(
+            title = "Tennis API",
+            subtitle = "api-tennis.com",
+            currentKey = state.tennisKey,
+            isExpired = state.tennisKeyExpired,
+            statusText = if (state.tennisKeyExpired) "Fehlerhaft/Abgelaufen" else "Aktiv",
+            isTesting = state.isTestingTennis,
+            testResult = state.tennisTestResult,
+            signupUrl = "https://api-tennis.com",
+            onSave = viewModel::saveTennisKey,
+            onTest = { viewModel.testTennisKey(it) }
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+        // The Odds API Section
+        ApiKeySection(
+            title = "The Odds API",
+            subtitle = "api.the-odds-api.com · ${state.oddsQuotaRemaining?.let { "$it Requests übrig" } ?: "Quota unbekannt"}",
+            currentKey = state.oddsApiKey,
+            isExpired = false,
+            statusText = "Aktiv",
+            isTesting = false,
+            testResult = null,
+            signupUrl = "https://the-odds-api.com",
+            onSave = viewModel::saveOddsApiKey,
+            onTest = {}
+        )
     }
 }
 
@@ -288,18 +359,106 @@ private fun StatusChip(text: String, isActive: Boolean, isExpired: Boolean) {
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = AuraPurple,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
-    )
+private fun DataSyncContent() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        RankingsSyncItem()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        OddsSyncItem()
+    }
 }
 
 @Composable
-private fun RankingsSyncCard() {
+private fun AppearanceSettingsContent(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel
+) {
+    val presetColors = listOf(
+        0xFFBBDEFB to "Blau",
+        0xFFC8E6C9 to "Grün",
+        0xFFF8BBD0 to "Rosa",
+        0xFFD1C4E9 to "Lila",
+        0xFFFFF9C4 to "Gelb"
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        // Tab Bar Gradient Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Tab Bar Gradient", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("Deaktiveren für komplette Transparenz", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
+            }
+            Switch(
+                checked = state.showTabGradient,
+                onCheckedChange = { viewModel.setShowTabGradient(it) },
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
+            )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+        // Dynamic Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Dynamischer Farbverlauf", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("Wechselnde Aura-Farben", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
+            }
+            Switch(
+                checked = state.bgGradientDynamic,
+                onCheckedChange = { viewModel.updateBgGradientSettings(state.bgGradientHeight, state.bgGradientColor, it) },
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
+            )
+        }
+
+        // Height Slider
+        Column {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Gradient Ausdehnung", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("${(state.bgGradientHeight * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = AuraPurple, fontWeight = FontWeight.Bold)
+            }
+            Slider(
+                value = state.bgGradientHeight,
+                onValueChange = { viewModel.updateBgGradientSettings(it, state.bgGradientColor, state.bgGradientDynamic) },
+                valueRange = 0.1f..2.0f,
+                colors = SliderDefaults.colors(thumbColor = AuraPurple, activeTrackColor = AuraPurple)
+            )
+        }
+
+        // Color Presets
+        if (!state.bgGradientDynamic) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Primärfarbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    presetColors.forEach { (hex, _) ->
+                        val isSelected = state.bgGradientColor == hex
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(hex))
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
+                                    shape = CircleShape
+                                )
+                                .clickable { viewModel.updateBgGradientSettings(state.bgGradientHeight, hex, state.bgGradientDynamic) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankingsSyncItem() {
     val context = LocalContext.current
     val workManager = remember { WorkManager.getInstance(context) }
     val workInfos by workManager
@@ -312,7 +471,6 @@ private fun RankingsSyncCard() {
 
     var showSuccess by remember { mutableStateOf(false) }
 
-    // Show success for 3 seconds after completion
     LaunchedEffect(syncState) {
         if (syncState == androidx.work.WorkInfo.State.SUCCEEDED) {
             showSuccess = true
@@ -321,45 +479,43 @@ private fun RankingsSyncCard() {
         }
     }
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Rankings und Elo-Scores", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Täglicher automatischer Sync der ATP/WTA Rankings & Elo Scores (um 3:00 Uhr).", 
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            
-            Button(
-                onClick = {
-                    workManager.enqueueUniqueWork(
-                        "${RankingsAndEloSyncWorker.WORK_NAME}_manual", 
-                        androidx.work.ExistingWorkPolicy.REPLACE, 
-                        androidx.work.OneTimeWorkRequestBuilder<RankingsAndEloSyncWorker>().build()
-                    )
-                }, 
-                enabled = !isSyncing, 
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Rankings & Elo-Scores", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        Text("Täglicher Sync der ATP/WTA Rankings & Elo Scores (um 3:00 Uhr).", 
+            style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
+        
+        Button(
+            onClick = {
+                workManager.enqueueUniqueWork(
+                    "${RankingsAndEloSyncWorker.WORK_NAME}_manual", 
+                    androidx.work.ExistingWorkPolicy.REPLACE, 
+                    androidx.work.OneTimeWorkRequestBuilder<RankingsAndEloSyncWorker>().build()
                 )
-            ) {
-                if (isSyncing) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Synchronisiere...")
-                } else if (showSuccess) {
-                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Erfolgreich!")
-                } else {
-                    Text("Jetzt synchronisieren")
-                }
+            }, 
+            enabled = !isSyncing, 
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
+            )
+        ) {
+            if (isSyncing) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Synchronisiere...")
+            } else if (showSuccess) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Erfolgreich!")
+            } else {
+                Text("Jetzt synchronisieren")
             }
         }
     }
 }
 
 @Composable
-private fun OddsSyncCard() {
+private fun OddsSyncItem() {
     val context = LocalContext.current
     val workManager = remember { WorkManager.getInstance(context) }
     val workInfos by workManager
@@ -380,81 +536,62 @@ private fun OddsSyncCard() {
         }
     }
 
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Tipico Wettquoten", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text("Täglicher automatischer Sync der Wettquoten (um 7:00 Uhr). Hier manuell für alle offenen Spiele aktualisieren.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Wettquoten", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        Text("Aktualisiert Quoten für alle offenen Spiele des heutigen Tages.",
+            style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
 
-            Button(
-                onClick = {
-                    workManager.enqueueUniqueWork(
-                        "${com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME}_manual",
-                        androidx.work.ExistingWorkPolicy.REPLACE,
-                        androidx.work.OneTimeWorkRequestBuilder<com.lenz.tennisapp.worker.OddsSyncWorker>().build()
-                    )
-                },
-                enabled = !isSyncing,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
+        Button(
+            onClick = {
+                workManager.enqueueUniqueWork(
+                    "${com.lenz.tennisapp.worker.OddsSyncWorker.WORK_NAME}_manual",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    androidx.work.OneTimeWorkRequestBuilder<com.lenz.tennisapp.worker.OddsSyncWorker>().build()
                 )
-            ) {
-                if (isSyncing) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Synchronisiere...")
-                } else if (showSuccess) {
-                    Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Erfolgreich!")
-                } else {
-                    Text("Jetzt synchronisieren")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpcomingFeaturesCard() {
-    ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, Color.White, RoundedCornerShape(topStart = 32.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 32.dp)),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = AuraPurple.copy(alpha = 0.05f)
-        ),
-        shape = RoundedCornerShape(
-            topStart = 32.dp, 
-            topEnd = 16.dp, 
-            bottomStart = 16.dp, 
-            bottomEnd = 32.dp
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Kommende Features", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            
-            val features = listOf(
-                "✓" to ("Ranking Integration" to "ATP/WTA Ranking direkt beim Spielernamen"),
-                "✓" to ("Profil-Update" to "Überarbeitete Player Page mit Statistiken"),
-                "🚀" to ("KI mit Google Gemini" to "Fortgeschrittener Prognose-Algorithmus"),
-                "📅" to ("Match-Archiv" to "Historische Spiele mit Datumswahl"),
-                "👤" to ("Spieler-Historie" to "Direkte Links zu vergangenen Matches"),
-                "🧹" to ("Juniors-Filter" to "Ausblenden von Jugend-Turnieren"),
-                "🏆" to ("Vorjahressieger" to "Sync historischer Turniergewinner"),
-                "💡" to ("KI-Tipps & Analyse" to "Vertiefte Experten-Einblicke pro Match")
+            },
+            enabled = !isSyncing,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (showSuccess) Color(0xFF4CAF50) else AuraDeep
             )
+        ) {
+            if (isSyncing) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Synchronisiere...")
+            } else if (showSuccess) {
+                Icon(Icons.Default.Check, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Erfolgreich!")
+            } else {
+                Text("Jetzt synchronisieren")
+            }
+        }
+    }
+}
 
-            features.forEach { (icon, data) ->
-                val (title, desc) = data
-                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(icon, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
-                    Column {
-                        Text(title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                        Text(desc, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+@Composable
+private fun UpcomingFeaturesContent() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Roadmap", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        
+        val features = listOf(
+            "✓" to ("Ranking Integration" to "ATP/WTA Ranking direkt beim Spielernamen"),
+            "✓" to ("Aura Design" to "Modernes, dynamisches UI & Verläufe"),
+            "🚀" to ("KI mit Google Gemini" to "Fortgeschrittener Prognose-Algorithmus"),
+            "📅" to ("Match-Archiv" to "Historische Spiele mit Datumswahl"),
+            "🏆" to ("Vorjahressieger" to "Sync historischer Turniergewinner"),
+            "💡" to ("KI-Tipps & Analyse" to "Vertiefte Experten-Einblicke pro Match")
+        )
+
+        features.forEach { (icon, data) ->
+            val (title, desc) = data
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(icon, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
+                Column {
+                    Text(title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = AuraDeep)
+                    Text(desc, style = MaterialTheme.typography.labelSmall, color = AuraDeep.copy(alpha = 0.5f))
                 }
             }
         }
@@ -462,11 +599,9 @@ private fun UpcomingFeaturesCard() {
 }
 
 @Composable
-private fun InfoCard() {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Tennis Today v4.7", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-            Text("Daten von api-tennis.com & tennisabstract.com", style = MaterialTheme.typography.bodySmall)
-        }
+private fun InfoContent() {
+    Column {
+        Text("Tennis Today v4.7.2", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = AuraDeep)
+        Text("Daten von api-tennis.com & tennisabstract.com", style = MaterialTheme.typography.labelSmall, color = AuraDeep.copy(alpha = 0.5f))
     }
 }

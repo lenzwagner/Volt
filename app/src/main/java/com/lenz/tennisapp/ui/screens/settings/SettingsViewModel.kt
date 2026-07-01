@@ -17,7 +17,11 @@ data class SettingsUiState(
     val isTestingTennis: Boolean = false,
     val tennisTestResult: String? = null,
     val oddsApiKey: String = "",
-    val oddsQuotaRemaining: Int? = null
+    val oddsQuotaRemaining: Int? = null,
+    val showTabGradient: Boolean = true,
+    val bgGradientHeight: Float = 1.0f,
+    val bgGradientColor: Long = 0xFFBBDEFB,
+    val bgGradientDynamic: Boolean = false
 )
 
 @HiltViewModel
@@ -34,15 +38,35 @@ class SettingsViewModel @Inject constructor(
         keyStore.tennisKeyExpired,
         _isTestingTennis,
         _tennisTestResult,
-        combine(keyStore.oddsApiKey, keyStore.oddsQuotaRemaining) { key, quota -> key to quota }
-    ) { tennisKey, expired, testing, result, (oddsKey, quota) ->
+        combine(
+            keyStore.oddsApiKey, 
+            keyStore.oddsQuotaRemaining, 
+            keyStore.showTabGradient,
+            keyStore.bgGradientHeight,
+            keyStore.bgGradientColor,
+            keyStore.bgGradientDynamic
+        ) { values -> 
+            values
+        }
+    ) { tennisKey, expired, testing, result, extra ->
+        val oddsKey = extra[0] as String
+        val quota = extra[1] as Int?
+        val tabGradient = extra[2] as Boolean
+        val bgHeight = extra[3] as Float
+        val bgColor = extra[4] as Long
+        val bgDynamic = extra[5] as Boolean
+        
         SettingsUiState(
             tennisKey = tennisKey,
             tennisKeyExpired = expired,
             isTestingTennis = testing,
             tennisTestResult = result,
             oddsApiKey = oddsKey,
-            oddsQuotaRemaining = quota
+            oddsQuotaRemaining = quota,
+            showTabGradient = tabGradient,
+            bgGradientHeight = bgHeight,
+            bgGradientColor = bgColor,
+            bgGradientDynamic = bgDynamic
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -55,6 +79,16 @@ class SettingsViewModel @Inject constructor(
 
     fun saveOddsApiKey(key: String) {
         viewModelScope.launch { keyStore.setOddsApiKey(key.trim()) }
+    }
+
+    fun setShowTabGradient(show: Boolean) {
+        viewModelScope.launch { keyStore.setShowTabGradient(show) }
+    }
+
+    fun updateBgGradientSettings(height: Float, color: Long, dynamic: Boolean) {
+        viewModelScope.launch {
+            keyStore.setBgGradientSettings(height, color, dynamic)
+        }
     }
 
     fun testTennisKey(key: String) {

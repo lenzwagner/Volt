@@ -26,8 +26,35 @@ class ApiKeyStore @Inject constructor(
         val KEY_ODDS_LAST_SYNC_DATE = stringPreferencesKey("odds_last_sync_date")
         val KEY_PREDICTIONS_JSON = stringPreferencesKey("predictions_json")
         val KEY_PREDICTIONS_DATE = stringPreferencesKey("predictions_date")
+        val KEY_SHOW_TAB_GRADIENT = booleanPreferencesKey("show_tab_gradient")
+        
+        val KEY_BG_GRADIENT_HEIGHT = floatPreferencesKey("bg_gradient_height")
+        val KEY_BG_GRADIENT_COLOR = longPreferencesKey("bg_gradient_color")
+        val KEY_BG_GRADIENT_DYNAMIC = booleanPreferencesKey("bg_gradient_dynamic")
 
         const val DEFAULT_TENNIS_KEY = "f0f0e5e1da68afd8f29e7bdc62bdf556de4a23e67d48813d91f55f85b14c4987"
+    }
+
+    val showTabGradient: Flow<Boolean> = context.dataStore.data
+        .map { it[KEY_SHOW_TAB_GRADIENT] ?: true }
+
+    suspend fun setShowTabGradient(show: Boolean) = context.dataStore.edit {
+        it[KEY_SHOW_TAB_GRADIENT] = show
+    }
+
+    val bgGradientHeight: Flow<Float> = context.dataStore.data
+        .map { it[KEY_BG_GRADIENT_HEIGHT] ?: 1.0f }
+
+    val bgGradientColor: Flow<Long> = context.dataStore.data
+        .map { it[KEY_BG_GRADIENT_COLOR] ?: 0xFFBBDEFB.toLong() }
+
+    val bgGradientDynamic: Flow<Boolean> = context.dataStore.data
+        .map { it[KEY_BG_GRADIENT_DYNAMIC] ?: false }
+
+    suspend fun setBgGradientSettings(height: Float, color: Long, dynamic: Boolean) = context.dataStore.edit {
+        it[KEY_BG_GRADIENT_HEIGHT] = height
+        it[KEY_BG_GRADIENT_COLOR] = color
+        it[KEY_BG_GRADIENT_DYNAMIC] = dynamic
     }
 
     val tennisApiKey: Flow<String> = context.dataStore.data

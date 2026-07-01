@@ -70,8 +70,42 @@ fun AppNavigation(initialRoute: String? = null, initialMatchId: String? = null) 
 @Composable
 private fun AppMainContent(initialRoute: String? = null, initialMatchId: String? = null) {
     val homeViewModel: HomeViewModel = hiltViewModel()
+    val settingsViewModel: com.lenz.tennisapp.ui.screens.settings.SettingsViewModel = hiltViewModel()
+    
     val isDataReady by homeViewModel.isDataReady.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+
     val liveCount by homeViewModel.liveCount.collectAsStateWithLifecycle()
+
+    val infiniteTransition = rememberInfiniteTransition(label = "dynamicBg")
+    val dynamicColor1 by infiniteTransition.animateColor(
+        initialValue = Color(0xFFE3F2FD),
+        targetValue = Color(0xFFC8E6C9),
+        animationSpec = infiniteRepeatable(tween(3500, easing = LinearEasing), RepeatMode.Reverse),
+        label = "c1"
+    )
+    val dynamicColor2 by infiniteTransition.animateColor(
+        initialValue = Color(0xFFBBDEFB),
+        targetValue = Color(0xFFA5D6A7),
+        animationSpec = infiniteRepeatable(tween(4500, easing = LinearEasing), RepeatMode.Reverse),
+        label = "c2"
+    )
+
+    val backgroundBrush = remember(settingsState.bgGradientHeight, settingsState.bgGradientColor, settingsState.bgGradientDynamic, dynamicColor1, dynamicColor2) {
+        val accentColor2 = if (settingsState.bgGradientDynamic) dynamicColor2 else Color(settingsState.bgGradientColor)
+        
+        // Use color stops to keep the top white and have the gradient at the bottom.
+        // The height slider (0.1 to 2.0) controls where the white ends and the color starts.
+        // A value of 1.0 means the gradient starts at 50% of the screen.
+        val colorStart = (1f - (settingsState.bgGradientHeight * 0.5f)).coerceIn(0f, 0.95f)
+        
+        Brush.verticalGradient(
+            0.0f to Color.White,
+            colorStart to Color.White,
+            1.0f to accentColor2
+        )
+    }
+
     var splashVisible by remember { mutableStateOf(true) }
 
     // Logic to hide splash when data is ready
@@ -157,13 +191,17 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         .fillMaxWidth()
                         .height(130.dp)
                         .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0f),
-                                    Color.White.copy(alpha = 0.8f),
-                                    Color.White
+                            brush = if (settingsState.showTabGradient) {
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0f),
+                                        Color.White.copy(alpha = 0.8f),
+                                        Color.White
+                                    )
                                 )
-                            )
+                            } else {
+                                Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                            }
                         ),
                     contentAlignment = Alignment.BottomCenter
                 ) {
@@ -194,7 +232,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(backgroundBrush)
                 .padding(bottom = if (showBottomBar) 0.dp else innerPadding.calculateBottomPadding())
         ) {
             if (showBottomBar) {
@@ -220,7 +258,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize().background(Color.White),
+                modifier = Modifier.fillMaxSize().background(Color.Transparent),
                 userScrollEnabled = true,
                 beyondViewportPageCount = 1,
                 contentPadding = PaddingValues(bottom = 0.dp)
@@ -249,10 +287,10 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
             navController = navController,
             startDestination = Screen.Home.route,
             modifier = Modifier,
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            enterTransition = { fadeIn(tween(200)) },
+            exitTransition = { fadeOut(tween(150)) },
+            popEnterTransition = { fadeIn(tween(200)) },
+            popExitTransition = { fadeOut(tween(150)) }
         ) {
             composable(Screen.Home.route) {}
             composable(Screen.Predictions.route) {}
