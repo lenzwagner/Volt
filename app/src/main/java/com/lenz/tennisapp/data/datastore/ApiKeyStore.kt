@@ -31,6 +31,8 @@ class ApiKeyStore @Inject constructor(
         val KEY_BG_GRADIENT_HEIGHT = floatPreferencesKey("bg_gradient_height")
         val KEY_BG_GRADIENT_COLOR = longPreferencesKey("bg_gradient_color")
         val KEY_BG_GRADIENT_DYNAMIC = booleanPreferencesKey("bg_gradient_dynamic")
+        val KEY_BANNER_ALPHA = floatPreferencesKey("banner_alpha")
+        val KEY_TAB_BAR_COLOR = longPreferencesKey("tab_bar_color")
 
         const val DEFAULT_TENNIS_KEY = "f0f0e5e1da68afd8f29e7bdc62bdf556de4a23e67d48813d91f55f85b14c4987"
     }
@@ -51,10 +53,24 @@ class ApiKeyStore @Inject constructor(
     val bgGradientDynamic: Flow<Boolean> = context.dataStore.data
         .map { it[KEY_BG_GRADIENT_DYNAMIC] ?: false }
 
+    val bannerAlpha: Flow<Float> = context.dataStore.data
+        .map { it[KEY_BANNER_ALPHA] ?: 0.65f }
+
     suspend fun setBgGradientSettings(height: Float, color: Long, dynamic: Boolean) = context.dataStore.edit {
         it[KEY_BG_GRADIENT_HEIGHT] = height
         it[KEY_BG_GRADIENT_COLOR] = color
         it[KEY_BG_GRADIENT_DYNAMIC] = dynamic
+    }
+
+    suspend fun setBannerAlpha(alpha: Float) = context.dataStore.edit {
+        it[KEY_BANNER_ALPHA] = alpha
+    }
+
+    val tabBarColor: Flow<Long> = context.dataStore.data
+        .map { it[KEY_TAB_BAR_COLOR] ?: 0xFF918EF4L }
+
+    suspend fun setTabBarColor(color: Long) = context.dataStore.edit {
+        it[KEY_TAB_BAR_COLOR] = color
     }
 
     val tennisApiKey: Flow<String> = context.dataStore.data

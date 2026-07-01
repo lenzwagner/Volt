@@ -45,9 +45,12 @@ fun HomeScreen(
     onMatchClick: (String) -> Unit,
     onTournamentClick: (String, String) -> Unit = { _, _ -> },
     showHeader: Boolean = true,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    settingsViewModel: com.lenz.tennisapp.ui.screens.settings.SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.todayUiState.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+
     val tourFilter by viewModel.tourFilter.collectAsStateWithLifecycle()
     val formatFilter by viewModel.formatFilter.collectAsStateWithLifecycle()
     val categoryFilter by viewModel.categoryFilter.collectAsStateWithLifecycle()
@@ -143,6 +146,7 @@ fun HomeScreen(
                                     TournamentBanner(
                                         tournament = tournament,
                                         expanded = expanded,
+                                        alpha = settingsState.bannerAlpha,
                                         onClick = { expandedMap[tournament.id] = !expanded }
                                     )
                                 }
@@ -156,6 +160,7 @@ fun HomeScreen(
                                         MatchRow(
                                             match = match,
                                             onClick = { onMatchClick(match.id) },
+                                            alpha = settingsState.bannerAlpha,
                                             modifier = Modifier
                                                 .animateItem(
                                                     fadeInSpec = tween(durationMillis = 200),
@@ -494,6 +499,7 @@ fun <T> FilterSection(
 fun TournamentBanner(
     tournament: Tournament,
     expanded: Boolean,
+    alpha: Float,
     onClick: () -> Unit
 ) {
     val rotation by animateFloatAsState(
@@ -528,7 +534,7 @@ fun TournamentBanner(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
         shape = RoundedCornerShape(14.dp),
-        color = Color.White.copy(alpha = 0.95f),
+        color = Color.White.copy(alpha = alpha),
         border = BorderStroke(1.dp, AuraDeep.copy(alpha = 0.15f)),
         shadowElevation = 0.dp
     ) {
@@ -628,6 +634,7 @@ fun TournamentBanner(
 fun MatchRow(
     match: TennisMatch,
     onClick: () -> Unit,
+    alpha: Float,
     modifier: Modifier = Modifier
 ) {
     val isFinished = match.status == MatchStatus.FINISHED
@@ -644,12 +651,12 @@ fun MatchRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 1.dp)
-            .graphicsLayer { alpha = cardAlpha },
+            .graphicsLayer { this.alpha = cardAlpha },
         shape = RoundedCornerShape(10.dp),
         color = when {
-            isLive -> Color.White.copy(alpha = 0.9f)
-            isFinished -> Color.White.copy(alpha = 0.4f)
-            else -> Color.White.copy(alpha = 0.6f)
+            isLive -> Color.White.copy(alpha = (alpha + 0.2f).coerceIn(0.1f, 1f))
+            isFinished -> Color.White.copy(alpha = (alpha - 0.3f).coerceIn(0.1f, 1f))
+            else -> Color.White.copy(alpha = (alpha - 0.1f).coerceIn(0.1f, 1f))
         },
         border = BorderStroke(
             width = if (isLive) 1.dp else 0.5.dp,
@@ -706,46 +713,32 @@ fun MatchRow(
             // Live / Finished layout matching reference design
             val sets = match.score?.split(",")?.map { it.trim() } ?: emptyList()
             val gameScoreParts = match.gameScore?.split("-")
-            val homeGame = gameScoreParts?.getOrNull(0) ?: ""
-            val awayGame = gameScoreParts?.getOrNull(1) ?: ""
+            val homeGame = gameScoreParts?.getOrNull(0)?.trim() ?: ""
+            val awayGame = gameScoreParts?.getOrNull(1)?.trim() ?: ""
 
             Row(
                 modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: status badge + round
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.width(56.dp)
+                // Left: status indicator
+                Box(
+                    modifier = Modifier.width(20.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     when {
                         isLive -> {
-                            Surface(
-                                color = Color.Red,
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Text("LIVE", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color.Red, CircleShape)
+                            )
                         }
                         isInterrupted -> {
-                            Surface(
-                                color = Color(0xFF9E9E9E),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    "INT.",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color(0xFF9E9E9E), CircleShape)
+                            )
                         }
                         else -> {
                             Text("FT", style = MaterialTheme.typography.labelSmall, color = Color.Gray, fontWeight = FontWeight.Bold)

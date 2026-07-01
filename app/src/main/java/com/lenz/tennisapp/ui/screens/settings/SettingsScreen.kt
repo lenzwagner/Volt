@@ -381,43 +381,9 @@ private fun AppearanceSettingsContent(
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        // Tab Bar Gradient Toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Tab Bar Gradient", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text("Deaktiveren für komplette Transparenz", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
-            }
-            Switch(
-                checked = state.showTabGradient,
-                onCheckedChange = { viewModel.setShowTabGradient(it) },
-                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
-            )
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-        // Dynamic Toggle
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Dynamischer Farbverlauf", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text("Wechselnde Aura-Farben", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
-            }
-            Switch(
-                checked = state.bgGradientDynamic,
-                onCheckedChange = { viewModel.updateBgGradientSettings(state.bgGradientHeight, state.bgGradientColor, it) },
-                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
-            )
-        }
-
-        // Height Slider
+        // Background Gradient Settings
+        Text("Hintergrund Verlauf", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // Height Slider
         Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Gradient Ausdehnung", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
@@ -431,26 +397,67 @@ private fun AppearanceSettingsContent(
             )
         }
 
-        // Color Presets
-        if (!state.bgGradientDynamic) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Primärfarbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    presetColors.forEach { (hex, _) ->
-                        val isSelected = state.bgGradientColor == hex
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(hex))
-                                .border(
-                                    width = if (isSelected) 3.dp else 1.dp,
-                                    color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
-                                    shape = CircleShape
-                                )
-                                .clickable { viewModel.updateBgGradientSettings(state.bgGradientHeight, hex, state.bgGradientDynamic) }
-                        )
-                    }
+        // Banner Alpha Slider
+        Column {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Banner Transparenz", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("${(state.bannerAlpha * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = AuraPurple, fontWeight = FontWeight.Bold)
+            }
+            Slider(
+                value = state.bannerAlpha,
+                onValueChange = { viewModel.setBannerAlpha(it) },
+                valueRange = 0.1f..1.0f,
+                colors = SliderDefaults.colors(thumbColor = AuraPurple, activeTrackColor = AuraPurple)
+            )
+        }
+
+        // Background Color Presets
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Hintergrundfarbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                presetColors.forEach { (hex, _) ->
+                    val isSelected = state.bgGradientColor == hex
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(hex))
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.updateBgGradientSettings(state.bgGradientHeight, hex, state.bgGradientDynamic) }
+                    )
+                }
+            }
+        }
+
+        // Tab-Bar Color
+        val tabBarPresets = listOf(
+            0xFF1D1B20L to "Schwarz",
+            0xFF918EF4L to "Lila",
+            0xFF2D2B45L to "Dunkel",
+            0xFF3D5A80L to "Navy",
+            0xFF1B5E20L to "Grün"
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Tab-Bar Farbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                tabBarPresets.forEach { (hex, _) ->
+                    val isSelected = state.tabBarColor == hex
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(hex))
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.setTabBarColor(hex) }
+                    )
                 }
             }
         }

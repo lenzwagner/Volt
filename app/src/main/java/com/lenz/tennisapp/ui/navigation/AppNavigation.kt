@@ -77,32 +77,14 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
 
     val liveCount by homeViewModel.liveCount.collectAsStateWithLifecycle()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "dynamicBg")
-    val dynamicColor1 by infiniteTransition.animateColor(
-        initialValue = Color(0xFFE3F2FD),
-        targetValue = Color(0xFFC8E6C9),
-        animationSpec = infiniteRepeatable(tween(3500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "c1"
-    )
-    val dynamicColor2 by infiniteTransition.animateColor(
-        initialValue = Color(0xFFBBDEFB),
-        targetValue = Color(0xFFA5D6A7),
-        animationSpec = infiniteRepeatable(tween(4500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "c2"
-    )
-
-    val backgroundBrush = remember(settingsState.bgGradientHeight, settingsState.bgGradientColor, settingsState.bgGradientDynamic, dynamicColor1, dynamicColor2) {
-        val accentColor2 = if (settingsState.bgGradientDynamic) dynamicColor2 else Color(settingsState.bgGradientColor)
-        
-        // Use color stops to keep the top white and have the gradient at the bottom.
-        // The height slider (0.1 to 2.0) controls where the white ends and the color starts.
-        // A value of 1.0 means the gradient starts at 50% of the screen.
+    val backgroundBrush = remember(settingsState.bgGradientHeight, settingsState.bgGradientColor) {
+        val accentColor = Color(settingsState.bgGradientColor)
         val colorStart = (1f - (settingsState.bgGradientHeight * 0.5f)).coerceIn(0f, 0.95f)
         
         Brush.verticalGradient(
             0.0f to Color.White,
             colorStart to Color.White,
-            1.0f to accentColor2
+            1.0f to accentColor
         )
     }
 
@@ -126,7 +108,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
             
             // Initial/Default navigation bar setup
             if (splashVisible) {
-                window.navigationBarColor = android.graphics.Color.parseColor("#1D1B20") // AuraDeep
+                window.navigationBarColor = settingsState.tabBarColor.toInt()
                 controller.isAppearanceLightNavigationBars = false
             } else {
                 window.navigationBarColor = android.graphics.Color.WHITE
@@ -191,17 +173,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         .fillMaxWidth()
                         .height(130.dp)
                         .background(
-                            brush = if (settingsState.showTabGradient) {
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0f),
-                                        Color.White.copy(alpha = 0.8f),
-                                        Color.White
-                                    )
-                                )
-                            } else {
-                                Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-                            }
+                            brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
                         ),
                     contentAlignment = Alignment.BottomCenter
                 ) {
@@ -213,6 +185,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                         FloatingAuraNavigationBar(
                             selectedTabIndex = pagerState.currentPage,
                             liveCount = if (pagerState.currentPage != 0) liveCount else 0,
+                            tabBarColor = Color(settingsState.tabBarColor),
                             onTabSelected = { index ->
                                 if (pagerState.currentPage != index) {
                                     val targetRoute = bottomNavItems[index].route
@@ -258,7 +231,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
 
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize().background(Color.Transparent),
+                modifier = Modifier.fillMaxSize(),
                 userScrollEnabled = true,
                 beyondViewportPageCount = 1,
                 contentPadding = PaddingValues(bottom = 0.dp)
@@ -484,13 +457,14 @@ private fun SplashOverlay() {
 fun FloatingAuraNavigationBar(
     selectedTabIndex: Int,
     liveCount: Int = 0,
+    tabBarColor: Color = AuraPurple,
     onTabSelected: (Int) -> Unit
 ) {
     Surface(
         modifier = Modifier
             .width(380.dp)
             .height(76.dp),
-        color = AuraDeep.copy(alpha = 0.96f),
+        color = tabBarColor,
         shape = CircleShape,
         shadowElevation = 16.dp,
         tonalElevation = 8.dp
@@ -513,7 +487,7 @@ fun FloatingAuraNavigationBar(
                 )
 
                 val tint by animateColorAsState(
-                    targetValue = if (isSelected) AuraLime else Color.White.copy(alpha = 0.3f),
+                    targetValue = if (isSelected) AuraLime else Color.White.copy(alpha = 0.5f),
                     animationSpec = tween(250), // Faster transition
                     label = "tint"
                 )
@@ -536,7 +510,7 @@ fun FloatingAuraNavigationBar(
                             modifier = Modifier
                                 .size(50.dp)
                                 .clip(CircleShape)
-                                .background(AuraPurple.copy(alpha = 0.15f))
+                                .background(Color.White.copy(alpha = 0.18f))
                         )
                     }
 

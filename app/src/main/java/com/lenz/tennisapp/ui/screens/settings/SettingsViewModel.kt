@@ -21,7 +21,9 @@ data class SettingsUiState(
     val showTabGradient: Boolean = true,
     val bgGradientHeight: Float = 1.0f,
     val bgGradientColor: Long = 0xFFBBDEFB,
-    val bgGradientDynamic: Boolean = false
+    val bgGradientDynamic: Boolean = false,
+    val bannerAlpha: Float = 0.65f,
+    val tabBarColor: Long = 0xFF918EF4L
 )
 
 @HiltViewModel
@@ -44,8 +46,10 @@ class SettingsViewModel @Inject constructor(
             keyStore.showTabGradient,
             keyStore.bgGradientHeight,
             keyStore.bgGradientColor,
-            keyStore.bgGradientDynamic
-        ) { values -> 
+            keyStore.bgGradientDynamic,
+            keyStore.bannerAlpha,
+            keyStore.tabBarColor
+        ) { values ->
             values
         }
     ) { tennisKey, expired, testing, result, extra ->
@@ -55,7 +59,9 @@ class SettingsViewModel @Inject constructor(
         val bgHeight = extra[3] as Float
         val bgColor = extra[4] as Long
         val bgDynamic = extra[5] as Boolean
-        
+        val bAlpha = extra[6] as Float
+        val tabColor = extra[7] as Long
+
         SettingsUiState(
             tennisKey = tennisKey,
             tennisKeyExpired = expired,
@@ -66,7 +72,9 @@ class SettingsViewModel @Inject constructor(
             showTabGradient = tabGradient,
             bgGradientHeight = bgHeight,
             bgGradientColor = bgColor,
-            bgGradientDynamic = bgDynamic
+            bgGradientDynamic = bgDynamic,
+            bannerAlpha = bAlpha,
+            tabBarColor = tabColor
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -88,6 +96,18 @@ class SettingsViewModel @Inject constructor(
     fun updateBgGradientSettings(height: Float, color: Long, dynamic: Boolean) {
         viewModelScope.launch {
             keyStore.setBgGradientSettings(height, color, dynamic)
+        }
+    }
+
+    fun setBannerAlpha(alpha: Float) {
+        viewModelScope.launch {
+            keyStore.setBannerAlpha(alpha)
+        }
+    }
+
+    fun setTabBarColor(color: Long) {
+        viewModelScope.launch {
+            keyStore.setTabBarColor(color)
         }
     }
 
