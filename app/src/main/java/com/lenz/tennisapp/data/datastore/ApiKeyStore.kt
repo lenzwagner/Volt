@@ -33,6 +33,7 @@ class ApiKeyStore @Inject constructor(
         val KEY_BG_GRADIENT_DYNAMIC = booleanPreferencesKey("bg_gradient_dynamic")
         val KEY_BANNER_ALPHA = floatPreferencesKey("banner_alpha")
         val KEY_TAB_BAR_COLOR = longPreferencesKey("tab_bar_color")
+        val KEY_TAB_ACCENT_COLOR = longPreferencesKey("tab_accent_color")
 
         const val DEFAULT_TENNIS_KEY = "f0f0e5e1da68afd8f29e7bdc62bdf556de4a23e67d48813d91f55f85b14c4987"
     }
@@ -71,6 +72,13 @@ class ApiKeyStore @Inject constructor(
 
     suspend fun setTabBarColor(color: Long) = context.dataStore.edit {
         it[KEY_TAB_BAR_COLOR] = color
+    }
+
+    val tabAccentColor: Flow<Long> = context.dataStore.data
+        .map { it[KEY_TAB_ACCENT_COLOR] ?: 0xFFD9FF5FL }
+
+    suspend fun setTabAccentColor(color: Long) = context.dataStore.edit {
+        it[KEY_TAB_ACCENT_COLOR] = color
     }
 
     val tennisApiKey: Flow<String> = context.dataStore.data

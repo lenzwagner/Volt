@@ -23,7 +23,8 @@ data class SettingsUiState(
     val bgGradientColor: Long = 0xFFBBDEFB,
     val bgGradientDynamic: Boolean = false,
     val bannerAlpha: Float = 0.65f,
-    val tabBarColor: Long = 0xFF918EF4L
+    val tabBarColor: Long = 0xFF918EF4L,
+    val tabAccentColor: Long = 0xFFD9FF5FL
 )
 
 @HiltViewModel
@@ -48,7 +49,8 @@ class SettingsViewModel @Inject constructor(
             keyStore.bgGradientColor,
             keyStore.bgGradientDynamic,
             keyStore.bannerAlpha,
-            keyStore.tabBarColor
+            keyStore.tabBarColor,
+            keyStore.tabAccentColor
         ) { values ->
             values
         }
@@ -61,6 +63,7 @@ class SettingsViewModel @Inject constructor(
         val bgDynamic = extra[5] as Boolean
         val bAlpha = extra[6] as Float
         val tabColor = extra[7] as Long
+        val tabAccent = extra[8] as Long
 
         SettingsUiState(
             tennisKey = tennisKey,
@@ -74,7 +77,8 @@ class SettingsViewModel @Inject constructor(
             bgGradientColor = bgColor,
             bgGradientDynamic = bgDynamic,
             bannerAlpha = bAlpha,
-            tabBarColor = tabColor
+            tabBarColor = tabColor,
+            tabAccentColor = tabAccent
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -108,6 +112,12 @@ class SettingsViewModel @Inject constructor(
     fun setTabBarColor(color: Long) {
         viewModelScope.launch {
             keyStore.setTabBarColor(color)
+        }
+    }
+
+    fun setTabAccentColor(color: Long) {
+        viewModelScope.launch {
+            keyStore.setTabAccentColor(color)
         }
     }
 

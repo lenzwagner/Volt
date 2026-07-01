@@ -497,6 +497,35 @@ private fun AppearanceSettingsContent(
                 }
             }
         }
+
+        // Tab-Bar Accent Color (active icon/label)
+        val accentPresets = listOf(
+            0xFFD9FF5FL to "Lime",
+            0xFFFFFFFF to "Weiß",
+            0xFFFFD700L to "Gold",
+            0xFFFF6B6BL to "Rot",
+            0xFF80DEEAL to "Cyan"
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Aktiv-Tab Farbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                accentPresets.forEach { (hex, _) ->
+                    val isSelected = state.tabAccentColor == hex
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(hex))
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
+                                shape = CircleShape
+                            )
+                            .clickable { viewModel.setTabAccentColor(hex) }
+                    )
+                }
+            }
+        }
     }
 }
 

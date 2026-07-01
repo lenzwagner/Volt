@@ -186,6 +186,7 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
                             selectedTabIndex = pagerState.currentPage,
                             liveCount = if (pagerState.currentPage != 0) liveCount else 0,
                             tabBarColor = Color(settingsState.tabBarColor),
+                            tabAccentColor = Color(settingsState.tabAccentColor),
                             onTabSelected = { index ->
                                 if (pagerState.currentPage != index) {
                                     val targetRoute = bottomNavItems[index].route
@@ -458,6 +459,7 @@ fun FloatingAuraNavigationBar(
     selectedTabIndex: Int,
     liveCount: Int = 0,
     tabBarColor: Color = AuraPurple,
+    tabAccentColor: Color = AuraLime,
     onTabSelected: (Int) -> Unit
 ) {
     Surface(
@@ -487,7 +489,7 @@ fun FloatingAuraNavigationBar(
                 )
 
                 val tint by animateColorAsState(
-                    targetValue = if (isSelected) AuraLime else Color.White.copy(alpha = 0.5f),
+                    targetValue = if (isSelected) tabAccentColor else Color.White.copy(alpha = 0.5f),
                     animationSpec = tween(250), // Faster transition
                     label = "tint"
                 )
@@ -552,7 +554,7 @@ fun FloatingAuraNavigationBar(
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = 0.5.sp
                                 ),
-                                color = AuraLime,
+                                color = tabAccentColor,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
