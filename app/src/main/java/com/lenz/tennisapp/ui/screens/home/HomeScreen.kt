@@ -834,14 +834,14 @@ fun MatchRow(
                     if (isLive && match.gameScore != null) {
                         Box(
                             modifier = Modifier
-                                .padding(end = 8.dp)
+                                .padding(start = 8.dp, end = 8.dp)
                                 .width(1.2.dp)
                                 .height(64.dp)
                                 .background(Color.LightGray.copy(alpha = 0.4f))
                         )
                         Column(
                             modifier = Modifier.width(36.dp),
-                            horizontalAlignment = Alignment.Start,
+                            horizontalAlignment = Alignment.End,
                             verticalArrangement = Arrangement.Center
                         ) {
                             ScoreText(score = homeGame, isWinner = false, setDone = true, color = Color.Red, isBold = true, horizontalArrangement = Arrangement.Start)
@@ -849,8 +849,8 @@ fun MatchRow(
                             ScoreText(score = awayGame, isWinner = false, setDone = true, color = Color.Red, isBold = true, horizontalArrangement = Arrangement.Start)
                         }
                     }
-                    
-                    Spacer(Modifier.width(4.dp))
+
+                    Spacer(Modifier.width(2.dp))
 
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowRight,
