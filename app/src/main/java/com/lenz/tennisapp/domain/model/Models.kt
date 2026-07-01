@@ -30,7 +30,9 @@ data class TennisMatch(
     val isQualifying: Boolean = false,
     val winnerKey: String? = null,
     val setScores: String? = null,
-    val finalResult: String? = null
+    val finalResult: String? = null,
+    val homeOdds: Double? = null,
+    val awayOdds: Double? = null
 ) {
     fun isQualifyingMatch(): Boolean {
         val r = round?.lowercase() ?: ""

@@ -4,6 +4,44 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
+data class TheOddsSport(
+    @Json(name = "key") val key: String,
+    @Json(name = "group") val group: String = "",
+    @Json(name = "title") val title: String = "",
+    @Json(name = "active") val active: Boolean = false
+)
+
+@JsonClass(generateAdapter = true)
+data class TheOddsApiEvent(
+    @Json(name = "id") val id: String,
+    @Json(name = "sport_key") val sportKey: String,
+    @Json(name = "commence_time") val commenceTime: String,
+    @Json(name = "home_team") val homeTeam: String,
+    @Json(name = "away_team") val awayTeam: String,
+    @Json(name = "bookmakers") val bookmakers: List<TheOddsBookmaker> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class TheOddsBookmaker(
+    @Json(name = "key") val key: String,
+    @Json(name = "title") val title: String,
+    @Json(name = "markets") val markets: List<TheOddsMarket> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class TheOddsMarket(
+    @Json(name = "key") val key: String,
+    @Json(name = "outcomes") val outcomes: List<TheOddsOutcome> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class TheOddsOutcome(
+    @Json(name = "name") val name: String,
+    @Json(name = "price") val price: Double
+)
+
+// Legacy DTOs kept for OddsBlaze (unused path, left for build compat)
+@JsonClass(generateAdapter = true)
 data class OddsBlazResponse(
     @Json(name = "updated") val updated: String = "",
     @Json(name = "events") val events: List<OddsBlazEvent> = emptyList()

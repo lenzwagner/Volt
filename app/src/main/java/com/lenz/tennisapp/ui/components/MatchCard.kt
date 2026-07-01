@@ -242,6 +242,12 @@ fun MatchCard(
                 )
             }
 
+            if (match.status == MatchStatus.NOT_STARTED &&
+                match.homeOdds != null && match.awayOdds != null
+            ) {
+                OddsStrip(match.homeOdds, match.awayOdds)
+            }
+
             if (canPredict || userPrediction != null) {
                 PredictionStrip(
                     match = match,
@@ -250,6 +256,50 @@ fun MatchCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun OddsStrip(homeOdds: Double, awayOdds: Double) {
+    Surface(
+        color = AuraPurple.copy(alpha = 0.05f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "888",
+                style = MaterialTheme.typography.labelSmall,
+                color = AuraPurple.copy(alpha = 0.5f),
+                fontWeight = FontWeight.Bold
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OddsChip(homeOdds)
+                Text("·", color = AuraPurple.copy(alpha = 0.4f))
+                OddsChip(awayOdds)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OddsChip(odd: Double) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = AuraPurple.copy(alpha = 0.10f)
+    ) {
+        Text(
+            text = String.format("%.2f", odd),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = AuraDeep
+        )
     }
 }
 

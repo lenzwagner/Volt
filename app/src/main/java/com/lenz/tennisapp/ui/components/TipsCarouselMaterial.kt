@@ -2,6 +2,7 @@ package com.lenz.tennisapp.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -213,7 +214,11 @@ private fun TipAuraItem(
     Surface(
         modifier = modifier.bouncyClickable(onClick = onClick),
         shape = RoundedCornerShape(28.dp),
-        color = if (isActive) AuraPurple else AuraPurple.copy(alpha = 0.15f)
+        color = if (isActive) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.03f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isActive) AuraPurple.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
             AnimatedContent(
@@ -242,7 +247,7 @@ private fun TipAuraItem(
                         Text(
                             text = tip.match.tournament.uppercase(),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                            color = AuraDeep.copy(alpha = 0.6f),
+                            color = Color.White.copy(alpha = 0.5f),
                             fontWeight = FontWeight.Black,
                             letterSpacing = 1.sp
                         )
@@ -265,7 +270,7 @@ private fun TipAuraItem(
                         Text(
                             text = "VS ${opponent.split(" ").last().uppercase()}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = AuraPurple,
                             fontWeight = FontWeight.Black
                         )
                     }
@@ -275,7 +280,7 @@ private fun TipAuraItem(
                             text = "${(tip.aiProb * 100).roundToInt()}%",
                             style = MaterialTheme.typography.displayMedium,
                             fontWeight = FontWeight.Black,
-                            color = Color.White.copy(alpha = 0.2f)
+                            color = Color.White.copy(alpha = 0.15f)
                         )
                     }
                 }

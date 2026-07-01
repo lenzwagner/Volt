@@ -62,7 +62,10 @@ fun MatchDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF7F7F7))) {
+    val pageGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFFAFAFC), Color(0xFFFAFAFC), Color(0xFFE5F2FD))
+    )
+    Box(modifier = Modifier.fillMaxSize().background(pageGradient)) {
         when (val s = state) {
             is MatchDetailUiState.Error -> {
                 Column(
@@ -139,7 +142,13 @@ private fun StickyMatchBanner(
             contentScale = ContentScale.Crop,
             modifier = Modifier.matchParentSize().blur(10.dp)
         )
-        Box(modifier = Modifier.matchParentSize().background(Color(0xFF0A0A14).copy(alpha = 0.65f)))
+        Box(
+            modifier = Modifier.matchParentSize().background(
+                Brush.verticalGradient(
+                    listOf(AuraDeep.copy(alpha = 0.82f), AuraPurple.copy(alpha = 0.6f))
+                )
+            )
+        )
         Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.windowInsetsPadding(WindowInsets.statusBars).fillMaxWidth())
             Row(
@@ -336,12 +345,16 @@ private fun MatchHeader(
             contentScale = ContentScale.Crop,
             modifier = Modifier.matchParentSize().blur(10.dp)
         )
-        Box(modifier = Modifier.matchParentSize().background(Color(0xFF0A0A14).copy(alpha = 0.62f)))
+        Box(
+            modifier = Modifier.matchParentSize().background(
+                Brush.verticalGradient(
+                    listOf(AuraDeep.copy(alpha = 0.78f), AuraPurple.copy(alpha = 0.55f))
+                )
+            )
+        )
         Column(modifier = Modifier.fillMaxWidth()) {
             TopBarContent(
-                tournament = match.tournament,
-                category = match.tournamentCategory,
-                round = match.round,
+                match = match,
                 onBack = onBack,
                 onRefresh = onRefresh
             )
@@ -354,40 +367,54 @@ private fun MatchHeader(
 
 @Composable
 private fun TopBarContent(
-    tournament: String,
-    category: TournamentCategory,
-    round: String?,
+    match: TennisMatch,
     onBack: () -> Unit,
     onRefresh: () -> Unit
 ) {
+    val statusLabel = when (match.status) {
+        MatchStatus.LIVE -> "LIVE"
+        MatchStatus.FINISHED -> "Beendet"
+        MatchStatus.INTERRUPTED -> "Unterbrochen"
+        else -> match.time.take(5)
+    }
+
     Row(
         modifier = Modifier
             .windowInsetsPadding(WindowInsets.statusBars)
             .fillMaxWidth()
-            .height(56.dp)
+            .height(44.dp)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
         }
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = tournament,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1
-            )
-            round?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = match.tournament,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (match.status == MatchStatus.LIVE) "• $statusLabel" else "($statusLabel)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (match.status == MatchStatus.LIVE) AuraLime else Color.White.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            match.round?.let {
                 Text(
                     text = translateRound(it),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.55f)
+                    color = Color.White.copy(alpha = 0.45f)
                 )
             }
         }
-        IconButton(onClick = onRefresh) {
+        IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
             Icon(Icons.Default.Refresh, "Aktualisieren", tint = Color.White.copy(alpha = 0.6f))
         }
     }
@@ -429,30 +456,7 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
     val g1 = gameParts?.getOrNull(0)?.trim() ?: ""
     val g2 = gameParts?.getOrNull(1)?.trim() ?: ""
 
-    val statusLabel = when (match.status) {
-        MatchStatus.LIVE -> "LIVE"
-        MatchStatus.FINISHED -> "Beendet"
-        MatchStatus.INTERRUPTED -> "Unterbrochen"
-        else -> match.time.take(5)
-    }
-
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            Surface(
-                color = Color.White.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text(
-                    statusLabel,
-                    color = if (match.status == MatchStatus.LIVE) Color.Red else Color.White,
-                    fontWeight = FontWeight.Black, fontSize = 11.sp,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 12.dp)) {
         PlayerScoreRow(
             player = match.homePlayer,
             isServing = match.isHomeServing == true && isInPlay,
@@ -467,7 +471,7 @@ private fun ScoreHeaderContent(match: TennisMatch, onPlayerClick: (String, Strin
             onClick = { onPlayerClick(match.homePlayer.key, match.homePlayer.name) }
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         PlayerScoreRow(
             player = match.awayPlayer,
@@ -1025,7 +1029,7 @@ private fun FormSection(
     p2Matches: List<TennisMatch>
 ) {
     SectionTitle("AKTUELLE FORM")
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(12.dp))
 
     val p1Form = p1Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p1.key }.reversed()
     val p2Form = p2Matches.filter { it.status == MatchStatus.FINISHED }.take(5).map { it.winnerKey == p2.key }.reversed()
@@ -1044,28 +1048,29 @@ private fun FormSection(
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            pageSpacing = 12.dp
         ) { page ->
             val (player, form) = pages[page]
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = AuraDeep.copy(alpha = 0.06f),
-                tonalElevation = 0.dp
+                    .padding(horizontal = 4.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = AuraBlue.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, AuraBlue.copy(alpha = 0.2f))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.width(64.dp)) {
+                    Column(modifier = Modifier.width(72.dp)) {
                         Text(
-                            player.name.split(" ").last(),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
+                            player.name.split(" ").last().uppercase(),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
                             color = AuraDeep,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1076,12 +1081,12 @@ private fun FormSection(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(Modifier.size(7.dp).background(Color(0xFF4CAF50), CircleShape))
-                            Text("W", fontSize = 9.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.SemiBold)
+                            Text("W", fontSize = 10.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Black)
                             Box(Modifier.size(7.dp).background(Color(0xFFFF9800), CircleShape))
-                            Text("L", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.SemiBold)
+                            Text("L", fontSize = 10.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Black)
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(12.dp))
                     FormGraph(form = form, modifier = Modifier.weight(1f))
                 }
             }
@@ -1119,16 +1124,16 @@ private fun FormGraph(form: List<Boolean>, modifier: Modifier = Modifier) {
     }
     val winColor = Color(0xFF4CAF50)
     val lossColor = Color(0xFFFF9800)
-    val lineColor = Color(0xFFCCCCCC)
-    val dotRadius = 7.dp
-    val graphHeight = 56.dp
+    val lineColor = AuraDeep.copy(alpha = 0.08f)
+    val dotRadius = 6.dp
+    val graphHeight = 50.dp
 
     Canvas(modifier = modifier.height(graphHeight)) {
         val n = form.size
         val w = size.width
         val h = size.height
-        val topY = dotRadius.toPx() + 2f
-        val botY = h - dotRadius.toPx() - 2f
+        val topY = dotRadius.toPx() + 4f
+        val botY = h - dotRadius.toPx() - 4f
 
         fun xOf(i: Int) = if (n == 1) w / 2f else i * (w - dotRadius.toPx() * 2) / (n - 1) + dotRadius.toPx()
         fun yOf(won: Boolean) = if (won) topY else botY
@@ -1139,7 +1144,7 @@ private fun FormGraph(form: List<Boolean>, modifier: Modifier = Modifier) {
                 color = lineColor,
                 start = Offset(xOf(i), yOf(form[i])),
                 end = Offset(xOf(i + 1), yOf(form[i + 1])),
-                strokeWidth = 2.dp.toPx(),
+                strokeWidth = 1.5.dp.toPx(),
                 cap = StrokeCap.Round
             )
         }
@@ -1148,6 +1153,12 @@ private fun FormGraph(form: List<Boolean>, modifier: Modifier = Modifier) {
             drawCircle(
                 color = if (won) winColor else lossColor,
                 radius = dotRadius.toPx(),
+                center = Offset(xOf(i), yOf(won))
+            )
+            // Subtle glow for dots
+            drawCircle(
+                color = (if (won) winColor else lossColor).copy(alpha = 0.2f),
+                radius = dotRadius.toPx() + 4f,
                 center = Offset(xOf(i), yOf(won))
             )
         }

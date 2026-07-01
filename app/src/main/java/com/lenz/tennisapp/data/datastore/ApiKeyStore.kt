@@ -21,6 +21,9 @@ class ApiKeyStore @Inject constructor(
         val KEY_TENNIS_API = stringPreferencesKey("tennis_api_key")
         val KEY_TENNIS_EXPIRED = booleanPreferencesKey("tennis_key_expired")
         val KEY_ODDSBLAZ = stringPreferencesKey("oddsblaz_key")
+        val KEY_ODDS_API = stringPreferencesKey("odds_api_key")
+        val KEY_ODDS_QUOTA_REMAINING = intPreferencesKey("odds_api_quota_remaining")
+        val KEY_ODDS_LAST_SYNC_DATE = stringPreferencesKey("odds_last_sync_date")
         val KEY_PREDICTIONS_JSON = stringPreferencesKey("predictions_json")
         val KEY_PREDICTIONS_DATE = stringPreferencesKey("predictions_date")
 
@@ -36,6 +39,12 @@ class ApiKeyStore @Inject constructor(
     val oddsBlazKey: Flow<String> = context.dataStore.data
         .map { it[KEY_ODDSBLAZ] ?: BuildConfig.ODDSBLAZ_KEY }
 
+    val oddsApiKey: Flow<String> = context.dataStore.data
+        .map { it[KEY_ODDS_API] ?: BuildConfig.ODDS_API_KEY }
+
+    val oddsQuotaRemaining: Flow<Int?> = context.dataStore.data
+        .map { prefs -> prefs[KEY_ODDS_QUOTA_REMAINING] }
+
     suspend fun setTennisKey(key: String) = context.dataStore.edit {
         it[KEY_TENNIS_API] = key
         it[KEY_TENNIS_EXPIRED] = false
@@ -47,6 +56,20 @@ class ApiKeyStore @Inject constructor(
 
     suspend fun setOddsBlazKey(key: String) = context.dataStore.edit {
         it[KEY_ODDSBLAZ] = key
+    }
+
+    suspend fun setOddsApiKey(key: String) = context.dataStore.edit {
+        it[KEY_ODDS_API] = key
+    }
+
+    suspend fun setOddsQuotaRemaining(remaining: Int) = context.dataStore.edit {
+        it[KEY_ODDS_QUOTA_REMAINING] = remaining
+    }
+
+    val oddsLastSyncDate: Flow<String> = context.dataStore.data.map { it[KEY_ODDS_LAST_SYNC_DATE] ?: "" }
+
+    suspend fun setOddsLastSyncDate(date: String) = context.dataStore.edit {
+        it[KEY_ODDS_LAST_SYNC_DATE] = date
     }
 
     val predictionsJson: Flow<String> = context.dataStore.data.map { it[KEY_PREDICTIONS_JSON] ?: "" }

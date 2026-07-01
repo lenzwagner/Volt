@@ -145,17 +145,17 @@ private fun ApiSettingsBox(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                    // OddsBlaze Section
+                    // The Odds API Section
                     ApiKeySection(
-                        title = "OddsBlaze",
-                        subtitle = "odds.oddsblaze.com",
-                        currentKey = state.oddsBlazKey,
+                        title = "The Odds API",
+                        subtitle = "api.the-odds-api.com · ${state.oddsQuotaRemaining?.let { "$it Requests übrig" } ?: "Quota unbekannt"}",
+                        currentKey = state.oddsApiKey,
                         isExpired = false,
                         statusText = "Aktiv",
                         isTesting = false,
                         testResult = null,
-                        signupUrl = "https://oddsblaze.com",
-                        onSave = viewModel::saveOddsBlazKey,
+                        signupUrl = "https://the-odds-api.com",
+                        onSave = viewModel::saveOddsApiKey,
                         onTest = {}
                     )
 

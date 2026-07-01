@@ -80,10 +80,10 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOddsBlazService(moshi: Moshi): com.lenz.tennisapp.data.api.OddsBlazService = Retrofit.Builder()
-        .baseUrl("https://odds.oddsblaze.com/")
+    fun provideTheOddsApiService(moshi: Moshi): com.lenz.tennisapp.data.api.TheOddsApiService = Retrofit.Builder()
+        .baseUrl("https://api.the-odds-api.com/")
         .client(baseOkHttp().build())
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
-        .create(com.lenz.tennisapp.data.api.OddsBlazService::class.java)
+        .create(com.lenz.tennisapp.data.api.TheOddsApiService::class.java)
 }

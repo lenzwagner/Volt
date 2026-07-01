@@ -64,110 +64,122 @@ fun HomeScreen(
         categoryFilter != CategoryFilter.ALL
     ).count { it }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White,
+                        Color(0xFFE3F2FD), // Light blue like Gemini
+                        Color(0xFFBBDEFB)
+                    ),
+                    startY = 0f,
+                    endY = Float.POSITIVE_INFINITY
+                )
+            )
     ) {
-        val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
-        val tournaments = state.tournaments ?: emptyList()
+        Column(modifier = Modifier.fillMaxSize()) {
+            val expandedMap = remember { mutableStateMapOf<String, Boolean>() }
+            val tournaments = state.tournaments ?: emptyList()
 
-        CompactFilterRow(
-            liveFilterActive = liveFilter,
-            finishedFilterActive = finishedFilter,
-            liveCount = liveCount,
-            activeFilterCount = activeFilterCount,
-            onToggleLive = viewModel::toggleLiveFilter,
-            onToggleFinished = viewModel::toggleFinishedFilter,
-            onOpenFilters = { showFilters = true },
-            onCollapseAll = {
-                val allCollapsed = tournaments.all { expandedMap[it.id] == false }
-                val newState = allCollapsed
-                tournaments.forEach { expandedMap[it.id] = newState }
-            }
-        )
+            CompactFilterRow(
+                liveFilterActive = liveFilter,
+                finishedFilterActive = finishedFilter,
+                liveCount = liveCount,
+                activeFilterCount = activeFilterCount,
+                onToggleLive = viewModel::toggleLiveFilter,
+                onToggleFinished = viewModel::toggleFinishedFilter,
+                onOpenFilters = { showFilters = true },
+                onCollapseAll = {
+                    val allCollapsed = tournaments.all { expandedMap[it.id] == false }
+                    val newState = allCollapsed
+                    tournaments.forEach { expandedMap[it.id] = newState }
+                }
+            )
 
-        if (state.isLoading && !state.isRefreshing) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AuraPurple)
-            }
-        } else {
-            if (tournaments.isEmpty() && !state.isLoading) {
+            if (state.isLoading && !state.isRefreshing) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (finishedFilter) "Keine beendeten Spiele" else "Keine Matches gefunden",
-                        color = Color.Gray
-                    )
+                    CircularProgressIndicator(color = AuraPurple)
                 }
             } else {
-                // Ensure new tournaments are expanded by default
-                LaunchedEffect(tournaments) {
-                    tournaments.forEach { 
-                        if (it.id !in expandedMap) {
-                            expandedMap[it.id] = true
+                if (tournaments.isEmpty() && !state.isLoading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (finishedFilter) "Keine beendeten Spiele" else "Keine Matches gefunden",
+                            color = Color.Gray
+                        )
+                    }
+                } else {
+                    // Ensure new tournaments are expanded by default
+                    LaunchedEffect(tournaments) {
+                        tournaments.forEach { 
+                            if (it.id !in expandedMap) {
+                                expandedMap[it.id] = true
+                            }
                         }
                     }
-                }
 
-                val listState = rememberLazyListState()
-                // When the live filter toggles, glide back to the top so you're not
-                // left stranded inside a tournament that just got filtered out.
-                var firstFilterRun by remember { mutableStateOf(true) }
-                LaunchedEffect(liveFilter) {
-                    if (firstFilterRun) { firstFilterRun = false; return@LaunchedEffect }
-                    // Soft glide: if we're deep in the list, snap closer first so the
-                    // final animated stretch is short and smooth, not a long abrupt fling.
-                    if (listState.firstVisibleItemIndex > 6) {
-                        listState.scrollToItem(6)
+                    val listState = rememberLazyListState()
+                    // When the live filter toggles, glide back to the top so you're not
+                    // left stranded inside a tournament that just got filtered out.
+                    var firstFilterRun by remember { mutableStateOf(true) }
+                    LaunchedEffect(liveFilter) {
+                        if (firstFilterRun) { firstFilterRun = false; return@LaunchedEffect }
+                        // Soft glide: if we're deep in the list, snap closer first so the
+                        // final animated stretch is short and smooth, not a long abrupt fling.
+                        if (listState.firstVisibleItemIndex > 6) {
+                            listState.scrollToItem(6)
+                        }
+                        listState.animateScrollToItem(
+                            index = 0,
+                            scrollOffset = 0
+                        )
                     }
-                    listState.animateScrollToItem(
-                        index = 0,
-                        scrollOffset = 0
-                    )
-                }
 
-                PullToRefreshBox(
-                    isRefreshing = state.isRefreshing,
-                    onRefresh = viewModel::refresh,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 160.dp)
+                    PullToRefreshBox(
+                        isRefreshing = state.isRefreshing,
+                        onRefresh = viewModel::refresh,
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        tournaments.forEach { tournament ->
-                            item(key = "tour_${tournament.id}", contentType = "banner") {
-                                val expanded = expandedMap[tournament.id] ?: true
-                                TournamentBanner(
-                                    tournament = tournament,
-                                    expanded = expanded,
-                                    onClick = { expandedMap[tournament.id] = !expanded }
-                                )
-                            }
-
-                            if (expandedMap[tournament.id] != false) {
-                                items(
-                                    tournament.matches,
-                                    key = { "match_${it.id}" },
-                                    contentType = { "match" }
-                                ) { match ->
-                                    MatchRow(
-                                        match = match,
-                                        onClick = { onMatchClick(match.id) },
-                                        modifier = Modifier
-                                            .animateItem(
-                                                fadeInSpec = tween(durationMillis = 250),
-                                                fadeOutSpec = tween(durationMillis = 200),
-                                                placementSpec = spring(
-                                                    stiffness = Spring.StiffnessLow,
-                                                    visibilityThreshold = IntOffset.VisibilityThreshold
-                                                )
-                                            )
-                                            .padding(vertical = 1.dp)
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 160.dp)
+                        ) {
+                            tournaments.forEach { tournament ->
+                                item(key = "tour_${tournament.id}", contentType = "banner") {
+                                    val expanded = expandedMap[tournament.id] ?: true
+                                    TournamentBanner(
+                                        tournament = tournament,
+                                        expanded = expanded,
+                                        onClick = { expandedMap[tournament.id] = !expanded }
                                     )
                                 }
-                                item { Spacer(Modifier.height(6.dp)) }
+
+                                if (expandedMap[tournament.id] != false) {
+                                    items(
+                                        tournament.matches,
+                                        key = { "match_${it.id}" },
+                                        contentType = { "match" }
+                                    ) { match ->
+                                        MatchRow(
+                                            match = match,
+                                            onClick = { onMatchClick(match.id) },
+                                            modifier = Modifier
+                                                .animateItem(
+                                                    fadeInSpec = tween(durationMillis = 250),
+                                                    fadeOutSpec = tween(durationMillis = 200),
+                                                    placementSpec = spring(
+                                                        stiffness = Spring.StiffnessLow,
+                                                        visibilityThreshold = IntOffset.VisibilityThreshold
+                                                    )
+                                                )
+                                                .padding(vertical = 1.dp)
+                                        )
+                                    }
+                                    item { Spacer(Modifier.height(4.dp)) }
+                                }
                             }
                         }
                     }
@@ -520,29 +532,30 @@ fun TournamentBanner(
 
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = AuraDeep,
-        shadowElevation = 2.dp
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = Color.White.copy(alpha = 0.7f),
+        border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.2f)),
+        shadowElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Surface Color Accent Line
             Box(
                 Modifier
-                    .size(3.dp, 42.dp)
+                    .size(3.dp, 32.dp)
                     .background(surfaceColor, RoundedCornerShape(2.dp))
             )
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 // City / short name (top)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = (tournament.location ?: tournament.name.replace(Regex("""\s*\(.*?\)"""), "").trim()).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AuraDeep,
                         fontWeight = FontWeight.Black,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -565,7 +578,7 @@ fun TournamentBanner(
                     Text(
                         text = tournament.category.displayName.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.55f),
+                        color = AuraDeep.copy(alpha = 0.45f),
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -576,7 +589,7 @@ fun TournamentBanner(
                         Box(
                             modifier = Modifier
                                 .background(
-                                    Color.White.copy(alpha = 0.2f),
+                                    AuraDeep.copy(alpha = 0.05f),
                                     RoundedCornerShape(3.dp)
                                 )
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
@@ -584,7 +597,7 @@ fun TournamentBanner(
                             Text(
                                 text = if (isDoubles) "D" else "S",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = AuraDeep.copy(alpha = 0.6f),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 9.sp
                             )
@@ -594,7 +607,7 @@ fun TournamentBanner(
                     Spacer(Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .background(surfaceColor.copy(alpha = 0.22f), RoundedCornerShape(3.dp))
+                            .background(surfaceColor.copy(alpha = 0.12f), RoundedCornerShape(3.dp))
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
                         Text(
@@ -605,29 +618,13 @@ fun TournamentBanner(
                             fontSize = 9.sp
                         )
                     }
-                    if (tournament.isQualifying) {
-                        Spacer(Modifier.width(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(AuraLime.copy(alpha = 0.22f), RoundedCornerShape(3.dp))
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "QUALI",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AuraLime,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp
-                            )
-                        }
-                    }
                 }
             }
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
                 modifier = Modifier.graphicsLayer { rotationZ = rotation },
-                tint = Color.White.copy(alpha = 0.3f)
+                tint = AuraDeep.copy(alpha = 0.2f)
             )
         }
     }
@@ -652,18 +649,19 @@ fun MatchRow(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
+            .padding(horizontal = 12.dp, vertical = 1.dp)
             .graphicsLayer { alpha = cardAlpha },
         shape = RoundedCornerShape(10.dp),
         color = when {
-            isLive -> Color(0xFFFFF3F3)
-            isFinished -> Color(0xFFF2F2F2)
-            else -> Color(0xFFF9F9F9)
+            isLive -> Color.White.copy(alpha = 0.9f)
+            isFinished -> Color.White.copy(alpha = 0.4f)
+            else -> Color.White.copy(alpha = 0.6f)
         },
         border = BorderStroke(
-            width = if (isLive) 1.5.dp else 1.dp,
-            color = if (isLive) Color.Red.copy(alpha = 0.4f) else Color.LightGray.copy(alpha = 0.3f)
-        )
+            width = if (isLive) 1.dp else 0.5.dp,
+            color = if (isLive) Color.Red.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.1f)
+        ),
+        shadowElevation = 0.dp
     ) {
         if (isUpcoming) {
             Row(

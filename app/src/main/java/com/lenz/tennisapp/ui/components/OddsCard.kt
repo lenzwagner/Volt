@@ -20,19 +20,16 @@ fun OddsCard(
     player2Name: String,
     modifier: Modifier = Modifier
 ) {
-    // Filter: nur Tipico Quoten
-    val tipicoOdds = odds.firstOrNull { it.bookmakerName.lowercase().contains("tipico") }
-    val noOdds = tipicoOdds == null
+    val bestOdds = odds.firstOrNull()
+    val noOdds = bestOdds == null
 
-    // Berechne wahre Wahrscheinlichkeit aus Tipico-Quoten (bereinigt um Buchmachermarge)
-    val (player1TrueProb, player2TrueProb, margin) = if (tipicoOdds != null) {
-        val p1Implied = (1.0 / tipicoOdds.homeOdds) * 100
-        val p2Implied = (1.0 / tipicoOdds.awayOdds) * 100
+    val (player1TrueProb, player2TrueProb, margin) = if (bestOdds != null) {
+        val p1Implied = (1.0 / bestOdds.homeOdds) * 100
+        val p2Implied = (1.0 / bestOdds.awayOdds) * 100
         val total = p1Implied + p2Implied
         val p1True = (p1Implied / total) * 100
         val p2True = (p2Implied / total) * 100
-        val buchmacherMargin = (total - 100.0)
-        Triple(p1True, p2True, buchmacherMargin)
+        Triple(p1True, p2True, total - 100.0)
     } else {
         Triple(0.0, 0.0, 0.0)
     }
@@ -68,7 +65,7 @@ fun OddsCard(
                             color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Text(
-                                String.format("%.2f", tipicoOdds.homeOdds),
+                                String.format("%.2f", bestOdds.homeOdds),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -90,7 +87,7 @@ fun OddsCard(
                             color = MaterialTheme.colorScheme.secondaryContainer
                         ) {
                             Text(
-                                String.format("%.2f", tipicoOdds.awayOdds),
+                                String.format("%.2f", bestOdds.awayOdds),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -147,11 +144,21 @@ fun OddsCard(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    "Buchmachermarge: ${margin.roundToInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Marge: ${margin.roundToInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        bestOdds!!.bookmakerName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
             }
         }
     }

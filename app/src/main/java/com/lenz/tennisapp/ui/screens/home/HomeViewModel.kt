@@ -186,9 +186,16 @@ class HomeViewModel @Inject constructor(
                 // Sync live rankings in background so ranking badges appear without manual sync
                 launch {
                     try { playerRepository.syncLiveRankings() } catch (_: Exception) {}
-                    // Re-read tournaments after rankings are written
                     val enriched = repository.fetchOnce()
                     if (enriched.isNotEmpty()) _rawToday.value = enriched
+                }
+                // Sync odds once per day in background — updates DB, next fetchOnce shows them
+                launch {
+                    try {
+                        repository.syncOddsIfNeeded()
+                        val withOdds = repository.fetchOnce()
+                        if (withOdds.isNotEmpty()) _rawToday.value = withOdds
+                    } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Refresh failed")
