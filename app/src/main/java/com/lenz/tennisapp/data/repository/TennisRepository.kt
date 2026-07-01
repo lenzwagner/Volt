@@ -1094,7 +1094,7 @@ class TennisRepository @Inject constructor(
         recentHistoryFetchedDay = today
         try {
             val apiKey = keyStore.tennisApiKey.first().takeIf { it.isNotBlank() }
-            val from = today.minusDays(14).format(dateFormatter)
+            val from = today.minusMonths(3).format(dateFormatter)
             val to = today.minusDays(1).format(dateFormatter)
             val response = tennisApi.getFixtures(eventType = 1, dateStart = from, dateStop = to, apiKey = apiKey)
             response.result?.mapNotNull { it.toEntity() }?.let { entities ->
