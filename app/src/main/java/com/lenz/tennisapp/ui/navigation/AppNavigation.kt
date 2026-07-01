@@ -22,7 +22,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
+
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -78,25 +78,18 @@ private fun AppMainContent(initialRoute: String? = null, initialMatchId: String?
 
     val liveCount by homeViewModel.liveCount.collectAsStateWithLifecycle()
 
-    val dynamicColors = listOf(
-        Color(0xFFBBDEFB), Color(0xFFC8E6C9), Color(0xFFF8BBD0),
-        Color(0xFFD1C4E9), Color(0xFFFFF9C4), Color(0xFFFFCCBC)
-    )
     val dynamicTransition = rememberInfiniteTransition("bgDynamic")
-    val dynamicIndex by dynamicTransition.animateFloat(
+    val hue by dynamicTransition.animateFloat(
         initialValue = 0f,
-        targetValue = dynamicColors.size.toFloat(),
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = dynamicColors.size * 3000, easing = LinearEasing),
+            animation = tween(durationMillis = 20000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "dynamicColorIndex"
+        label = "rainbowHue"
     )
     val dynamicAccent = if (settingsState.bgGradientDynamic) {
-        val idx = dynamicIndex.toInt().coerceIn(0, dynamicColors.size - 1)
-        val next = (idx + 1) % dynamicColors.size
-        val frac = dynamicIndex - dynamicIndex.toInt()
-        lerp(dynamicColors[idx], dynamicColors[next], frac)
+        Color.hsl(hue, saturation = 0.5f, lightness = 0.85f)
     } else Color(settingsState.bgGradientColor)
 
     val backgroundBrush = remember(settingsState.bgGradientHeight, dynamicAccent) {
