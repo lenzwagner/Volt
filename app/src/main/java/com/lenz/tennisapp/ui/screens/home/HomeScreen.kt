@@ -850,8 +850,6 @@ fun MatchRow(
                         }
                     }
 
-                    Spacer(Modifier.width(2.dp))
-
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowRight,
                         contentDescription = null,
