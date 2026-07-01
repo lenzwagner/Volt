@@ -469,62 +469,109 @@ private fun AppearanceSettingsContent(
             }
         }
 
-        // Tab-Bar Color
-        val tabBarPresets = listOf(
-            0xFF1D1B20L to "Schwarz",
-            0xFF918EF4L to "Lila",
-            0xFF2D2B45L to "Dunkel",
-            0xFF3D5A80L to "Navy",
-            0xFF1B5E20L to "Grün"
-        )
+        // Tab-Bar Color picker
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Tab-Bar Farbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                tabBarPresets.forEach { (hex, _) ->
-                    val isSelected = state.tabBarColor == hex
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(hex))
-                            .border(
-                                width = if (isSelected) 3.dp else 1.dp,
-                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.setTabBarColor(hex) }
-                    )
-                }
-            }
+            HslColorPicker(
+                color = Color(state.tabBarColor),
+                defaultLightness = 0.25f,
+                onColorChanged = { viewModel.setTabBarColor(it) }
+            )
         }
 
-        // Tab-Bar Accent Color (active icon/label)
-        val accentPresets = listOf(
-            0xFFD9FF5FL to "Lime",
-            0xFFFFFFFF to "Weiß",
-            0xFFFFD700L to "Gold",
-            0xFFFF6B6BL to "Rot",
-            0xFF80DEEAL to "Cyan"
-        )
+        // Active Tab Accent Color picker
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Aktiv-Tab Farbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                accentPresets.forEach { (hex, _) ->
-                    val isSelected = state.tabAccentColor == hex
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(hex))
-                            .border(
-                                width = if (isSelected) 3.dp else 1.dp,
-                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.setTabAccentColor(hex) }
+            HslColorPicker(
+                color = Color(state.tabAccentColor),
+                defaultLightness = 0.75f,
+                onColorChanged = { viewModel.setTabAccentColor(it) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HslColorPicker(
+    color: Color,
+    defaultLightness: Float = 0.5f,
+    onColorChanged: (Long) -> Unit
+) {
+    val hsvArr = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (color.red * 255).toInt(), (color.green * 255).toInt(), (color.blue * 255).toInt(), hsvArr
+    )
+    var hue by remember { mutableFloatStateOf(hsvArr[0]) }
+    var lightness by remember { mutableFloatStateOf(defaultLightness) }
+
+    val hueColors = remember {
+        listOf(
+            Color.hsl(0f, 1f, 0.5f), Color.hsl(30f, 1f, 0.5f), Color.hsl(60f, 1f, 0.5f),
+            Color.hsl(90f, 1f, 0.5f), Color.hsl(120f, 1f, 0.5f), Color.hsl(150f, 1f, 0.5f),
+            Color.hsl(180f, 1f, 0.5f), Color.hsl(210f, 1f, 0.5f), Color.hsl(240f, 1f, 0.5f),
+            Color.hsl(270f, 1f, 0.5f), Color.hsl(300f, 1f, 0.5f), Color.hsl(330f, 1f, 0.5f),
+            Color.hsl(360f, 1f, 0.5f)
+        )
+    }
+    val previewColor = Color.hsl(hue, 1f, lightness)
+
+    LaunchedEffect(hue, lightness) {
+        val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, if (lightness <= 0.5f) lightness * 2f else 1f)).toLong() and 0xFFFFFFFFL or 0xFF000000L
+        val c = Color.hsl(hue, 1f, lightness)
+        val packed = ((255L shl 24) or
+                ((c.red * 255).toLong() shl 16) or
+                ((c.green * 255).toLong() shl 8) or
+                (c.blue * 255).toLong()) or 0xFF000000L
+        onColorChanged(packed)
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(previewColor)
+                .border(2.dp, AuraDeep.copy(alpha = 0.15f), CircleShape)
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(androidx.compose.ui.graphics.Brush.horizontalGradient(hueColors))
+            )
+            Slider(
+                value = hue,
+                onValueChange = { hue = it },
+                valueRange = 0f..360f,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.hsl(hue, 1f, 0.5f),
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
+                )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            listOf(Color.Black, Color.hsl(hue, 1f, 0.5f), Color.White)
+                        )
                     )
-                }
-            }
+            )
+            Slider(
+                value = lightness,
+                onValueChange = { lightness = it },
+                valueRange = 0f..1f,
+                colors = SliderDefaults.colors(
+                    thumbColor = previewColor,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
+                )
+            )
         }
     }
 }

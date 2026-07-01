@@ -32,8 +32,8 @@ android {
         applicationId = "com.lenz.tennisapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 71
-        versionName = "6.20"
+        versionCode = 72
+        versionName = "6.21"
         buildConfigField("String", "ODDSBLAZ_KEY", "\"${localOrEnv("ODDSBLAZ_KEY")}\"")
         buildConfigField("String", "ODDS_API_KEY", "\"${localOrEnv("ODDS_API_KEY")}\"")
     }
