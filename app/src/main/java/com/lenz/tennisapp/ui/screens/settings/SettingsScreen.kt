@@ -381,9 +381,43 @@ private fun AppearanceSettingsContent(
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        // Background Gradient Settings
-        Text("Hintergrund Verlauf", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            // Height Slider
+        // Tab Bar Gradient Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Tab Bar Gradient", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("Deaktiveren für komplette Transparenz", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
+            }
+            Switch(
+                checked = state.showTabGradient,
+                onCheckedChange = { viewModel.setShowTabGradient(it) },
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
+            )
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+        // Dynamic Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Dynamischer Farbverlauf", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text("Wechselnde Aura-Farben", style = MaterialTheme.typography.bodySmall, color = AuraDeep.copy(alpha = 0.5f))
+            }
+            Switch(
+                checked = state.bgGradientDynamic,
+                onCheckedChange = { viewModel.updateBgGradientSettings(state.bgGradientHeight, state.bgGradientColor, it) },
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AuraPurple)
+            )
+        }
+
+        // Height Slider
         Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Gradient Ausdehnung", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
@@ -411,24 +445,26 @@ private fun AppearanceSettingsContent(
             )
         }
 
-        // Background Color Presets
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Hintergrundfarbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                presetColors.forEach { (hex, _) ->
-                    val isSelected = state.bgGradientColor == hex
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(hex))
-                            .border(
-                                width = if (isSelected) 3.dp else 1.dp,
-                                color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.updateBgGradientSettings(state.bgGradientHeight, hex, state.bgGradientDynamic) }
-                    )
+        // Background Color Presets (only when not dynamic)
+        if (!state.bgGradientDynamic) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Hintergrundfarbe", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    presetColors.forEach { (hex, _) ->
+                        val isSelected = state.bgGradientColor == hex
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(hex))
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) AuraPurple else AuraDeep.copy(alpha = 0.1f),
+                                    shape = CircleShape
+                                )
+                                .clickable { viewModel.updateBgGradientSettings(state.bgGradientHeight, hex, state.bgGradientDynamic) }
+                        )
+                    }
                 }
             }
         }
