@@ -1133,28 +1133,37 @@ class TennisRepository @Inject constructor(
     suspend fun syncOddsIfNeeded() {
         val today = LocalDate.now().format(dateFormatter)
         val lastSync = keyStore.oddsLastSyncDate.first()
-        if (lastSync == today) return  // already synced today
-        syncOddsForAllMatches()
-        keyStore.setOddsLastSyncDate(today)
+        if (lastSync == today) return
+        val updated = syncOddsForAllMatches()
+        // Only mark as done if at least 1 match was updated — retry on next launch if API failed
+        if (updated > 0) keyStore.setOddsLastSyncDate(today)
+        Timber.d("TheOddsApi syncOddsIfNeeded: updated=$updated, saved=${updated > 0}")
     }
 
-    suspend fun syncOddsForAllMatches() {
+    suspend fun syncOddsForAllMatches(): Int {
         val today = LocalDate.now().format(dateFormatter)
         val matches = matchDao.getOpenMatchesForDate(today)
-        if (matches.isEmpty()) return
+        Timber.d("TheOddsApi syncOddsForAllMatches: ${matches.size} open matches for $today")
+        if (matches.isEmpty()) return 0
 
         val oddsKey = keyStore.oddsApiKey.first()
-        // Discover active tournament keys (free, 0 credits), then fetch each once
+        if (oddsKey.isBlank()) { Timber.w("TheOddsApi: no API key"); return 0 }
+
         val activeSports = activeTennisSports(oddsKey)
+        Timber.d("TheOddsApi activeSports: $activeSports")
         val allSportKeys = (activeSports["atp"] ?: emptyList()) + (activeSports["wta"] ?: emptyList())
+        if (allSportKeys.isEmpty()) { Timber.w("TheOddsApi: no active tennis sports"); return 0 }
+
         val eventsBySport = mutableMapOf<String, List<TheOddsApiEvent>>()
         for (sport in allSportKeys) {
             try {
                 val resp = oddsApi.getOdds(sportKey = sport, apiKey = oddsKey)
                 val remaining = resp.headers()["x-requests-remaining"]?.toIntOrNull()
                 if (remaining != null) keyStore.setOddsQuotaRemaining(remaining)
-                if (resp.isSuccessful) eventsBySport[sport] = resp.body() ?: emptyList()
-                else Timber.w("TheOddsApi $sport HTTP ${resp.code()}")
+                if (resp.isSuccessful) {
+                    eventsBySport[sport] = resp.body() ?: emptyList()
+                    Timber.d("TheOddsApi $sport: ${eventsBySport[sport]?.size} events, quota=$remaining")
+                } else Timber.w("TheOddsApi $sport HTTP ${resp.code()}")
             } catch (e: Exception) {
                 Timber.w("TheOddsApi fetch failed for $sport: ${e.message}")
             }
@@ -1199,6 +1208,7 @@ class TennisRepository @Inject constructor(
             }
         }
         Timber.d("TheOddsApi sync: updated $updatedCount / ${matches.size}")
+        return updatedCount
     }
 
     private suspend fun loadOrFetchOdds(
@@ -1211,8 +1221,9 @@ class TennisRepository @Inject constructor(
             val syncedDay = Instant.ofEpochMilli(syncedAt)
                 .atZone(ZoneId.systemDefault()).toLocalDate()
             if (syncedDay == LocalDate.now()) {
-                // Already checked today (empty = no odds available), don't retry
-                return entity.oddsJson?.let { runCatching { oddsAdapter.fromJson(it) }.getOrNull() } ?: emptyList()
+                val cached = entity.oddsJson?.let { runCatching { oddsAdapter.fromJson(it) }.getOrNull() }
+                // If bulk sync stored real odds → return them; if empty → still try individual fetch
+                if (!cached.isNullOrEmpty()) return cached
             }
         }
         // New day or never fetched — fetch once and lock with timestamp
