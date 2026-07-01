@@ -1119,8 +1119,8 @@ class TennisRepository @Inject constructor(
             val first = parts.filter { it !in lastNameParts }.joinToString(" ")
             "$first $last".trim()
         } else {
-            // If no ALL CAPS part, assume it's already in a usable format (likely First Last).
-            parts.joinToString(" ") { it.lowercase().replaceFirstChar { it.uppercase() } }
+            // No ALL-CAPS part → already "Firstname Lastname" format, return as-is
+            apiName.trim()
         }
     }
 
